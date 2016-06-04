@@ -10,15 +10,6 @@ local function debug() end
 --   end
 -- end
 
--- local function pos2s(pos)
---   if pos.x then
---     return pos.x..','..pos.y
---   elseif pos[1] then
---     return pos[1]..','..pos[2]
---   end
---   return ''
--- end
-
 local function onTick(event)
   -- pollute once per second
   if event.tick%60==41 then 
@@ -27,7 +18,6 @@ local function onTick(event)
       if not source.entity or not source.entity.valid then
         table.remove(global.pollution_sources,i)
       else
-        -- debug(event.tick.." polluting at "..pos2s(source.entity.position).." amount "..source.amount)
         source.entity.surface.pollute(source.entity.position, source.amount * pollution_intensity)
         source.amount = source.amount*0.995
         if source.amount < 1 then
@@ -48,8 +38,7 @@ local function bounding_box_area(box)
   end
 end
 
-local function onEntityDied(event)
-  local e = event.entity
+local function fluidSpill(e)
   -- create a chemical spill for non-water fluids being destroyed
   if #e.fluidbox>0 then
     local dirty_fluid = 0
@@ -66,19 +55,18 @@ local function onEntityDied(event)
     else
       entity_name = 'chemical-spill-large'
     end
-    -- debug("new spill at "..pos2s(e.position)..' en='..entity_name)
     spill_entity = e.surface.create_entity{name=entity_name, position=e.position, force=e.force}
     if spill_entity then
-      -- debug("amount = "..dirty_fluid/100)
       global.pollution_sources[#global.pollution_sources+1] = {entity=spill_entity,amount=dirty_fluid/100}
     end
   end
+end
+
+local function remnantPollution(e)
   -- create one-time pollution for the destroyed entity itself
   for cn,cep in pairs(game.entity_prototypes[e.name].corpses) do
-    -- debug(cn..' '..pos2s(cep.selection_box.left_top)..' - '..pos2s(cep.selection_box.right_bottom))
     -- small remnants have size 1, medium 4, large 9
     local corpse_size = bounding_box_area(cep.selection_box)
-    -- debug(event.tick.." polluting at "..pos2s(e.position).." amount "..corpse_size*400)
     e.surface.pollute(e.position, corpse_size*corpse_size*100 * pollution_intensity)
     break
   end
@@ -96,6 +84,17 @@ local function onEntityDied(event)
       end
     end
   end
+end
+
+local function onEntityDied(event)
+  local e = event.entity
+  fluidSpill(e)
+  remnantPollution(e)
+end
+
+local function onEntityMined(event)
+  local e = event.entity
+  fluidSpill(e)
 end
 
 local function checkForMigration(old_version, new_version)
@@ -123,5 +122,7 @@ script.on_configuration_changed(onLoad)
 script.on_load(onLoad)
 
 script.on_event(defines.events.on_entity_died, onEntityDied)
+script.on_event(defines.events.on_preplayer_mined_item, onEntityMined)
+script.on_event(defines.events.on_robot_pre_mined, onEntityMined)
 
 script.on_event(defines.events.on_tick, onTick)
