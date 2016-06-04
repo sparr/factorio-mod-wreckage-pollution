@@ -41,23 +41,23 @@ end
 local function fluidSpill(e)
   -- create a chemical spill for non-water fluids being destroyed
   if #e.fluidbox>0 then
-    local dirty_fluid = 0
+    local spill_amount = 0
     for b=1,#e.fluidbox do
       if e.fluidbox[b] and e.fluidbox[b].type ~= "water" then
-        dirty_fluid = dirty_fluid + e.fluidbox[b].amount
+        local spill_amount = e.fluidbox[b].amount
+        local spill_size
+        if spill_amount<100 then
+          spill_size = 'small'
+        elseif spill_amount<1000 then
+          spill_size = 'medium'
+        else
+          spill_size = 'large'
+        end
+        spill_entity = e.surface.create_entity{name='chemical-spill-'..e.fluidbox[b].type..'-'..spill_size, position=e.position, force=e.force}
+        if spill_entity then
+          global.pollution_sources[#global.pollution_sources+1] = {entity=spill_entity,amount=spill_amount/100}
+        end
       end
-    end
-    local entity_name
-    if dirty_fluid<100 then
-      entity_name = 'chemical-spill-small'
-    elseif dirty_fluid<1000 then
-      entity_name = 'chemical-spill-medium'
-    else
-      entity_name = 'chemical-spill-large'
-    end
-    spill_entity = e.surface.create_entity{name=entity_name, position=e.position, force=e.force}
-    if spill_entity then
-      global.pollution_sources[#global.pollution_sources+1] = {entity=spill_entity,amount=dirty_fluid/100}
     end
   end
 end
