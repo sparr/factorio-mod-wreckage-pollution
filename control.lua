@@ -1,6 +1,6 @@
 require "config"
 
-local mod_version="0.0.2"
+local mod_version="0.0.3"
 local mod_data_version="0.0.1"
 
 local function debug() end
