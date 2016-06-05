@@ -62,25 +62,27 @@ local function fluidSpill(e)
   end
 end
 
-local function remnantPollution(e)
-  -- create one-time pollution for the destroyed entity itself
-  for cn,cep in pairs(game.entity_prototypes[e.name].corpses) do
-    -- small remnants have size 1, medium 4, large 9
-    local corpse_size = bounding_box_area(cep.selection_box)
-    e.surface.pollute(e.position, corpse_size*corpse_size*100 * pollution_intensity)
-    break
+-- create one-time pollution based on the corpse/remnant definition of an entity
+local function corpsesPollution(entity_name,surface,position)
+  if game.entity_prototypes[entity_name].corpses then
+    for cn,cep in pairs(game.entity_prototypes[entity_name].corpses) do
+      -- small remnants have size 1, medium 4, large 9
+      local corpse_size = bounding_box_area(cep.selection_box)
+      surface.pollute(position, corpse_size*corpse_size*100 * pollution_intensity)
+      break
+    end
   end
+end
+
+local function remnantPollution(e)
+  corpsesPollution(e.name,e.surface,e.position)
   -- create one-time pollution for anything inside the destroyed entity
   for inv_num=1,8 do
     -- temporary workaround for lack of valid inventory index list in API
     local noerr,inventory = pcall(e.get_inventory,inv_num)
     if noerr then
       for item_name,item_count in pairs(inventory.get_contents()) do
-        for cn,cep in pairs(game.entity_prototypes[item_name].corpses) do
-          local corpse_size = bounding_box_area(cep.selection_box)
-          e.surface.pollute(e.position, corpse_size*corpse_size*100 * pollution_intensity * item_count)
-          break
-        end
+        corpsesPollution(item_name,e.surface,e.position)
       end
     end
   end
