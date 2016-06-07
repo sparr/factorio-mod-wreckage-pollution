@@ -1,11 +1,10 @@
 require "config"
 
-local mod_version="0.0.3"
-local mod_data_version="0.0.1"
+local mod_version="0.0.4"
+local mod_data_version="0.0.4"
 
-local function debug() end
 -- local function debug(...)
---   if game.players[1] then
+--   if game and game.players[1] then
 --     game.players[1].print(...)
 --   end
 -- end
@@ -18,9 +17,36 @@ local function onTick(event)
       if not source.entity or not source.entity.valid then
         table.remove(global.pollution_sources,i)
       else
-        source.entity.surface.pollute(source.entity.position, source.amount * pollution_intensity)
+        -- debug("pollute! "..source.entity.position.x..","..source.entity.position.y.." "..source.amount * .005 * pollution_intensity)
+        source.entity.surface.pollute(source.entity.position, source.amount * .005 * pollution_intensity)
         source.amount = source.amount*0.995
-        if source.amount < 1 then
+
+        if source.size == "large" and source.amount < large_spill_size then
+          -- debug("shrinking "..source.entity.name)
+          local old_entity = source.entity
+          source.entity = old_entity.surface.create_entity{
+            name='chemical-spill-'..source.fluid..'-'.."medium",
+            position=old_entity.position,
+            force=old_entity.force
+          }
+          source.size = "medium"
+          old_entity.destroy()
+        end
+        
+        if source.size == "medium" and source.amount < medium_spill_size then
+          -- debug("shrinking "..source.entity.name)
+          local old_entity = source.entity
+          source.entity = old_entity.surface.create_entity{
+            name='chemical-spill-'..source.fluid..'-'.."small",
+            position=old_entity.position,
+            force=old_entity.force
+          }
+          source.size = "small"
+          old_entity.destroy()
+        end
+
+        if source.amount < 10 and event.tick >= source.expiration then
+          -- debug("destroying "..source.entity.name)
           source.entity.destroy()
           table.remove(global.pollution_sources,i)
         end
@@ -55,7 +81,16 @@ local function fluidSpill(e)
         end
         spill_entity = e.surface.create_entity{name='chemical-spill-'..e.fluidbox[b].type..'-'..spill_size, position=e.position, force=e.force}
         if spill_entity then
-          global.pollution_sources[#global.pollution_sources+1] = {entity=spill_entity,amount=spill_amount/100}
+          global.pollution_sources[#global.pollution_sources+1] = {
+            entity = spill_entity,
+            amount = spill_amount,
+            size = spill_size,
+            fluid = e.fluidbox[b].type,
+            -- minimum time before disappearing
+            -- 15 minutes for a full tank
+            -- 66 seconds for a drop
+            expiration = game.tick + spill_amount*20 + 4000 
+          }
         end
       end
     end
@@ -105,6 +140,16 @@ end
 
 local function checkForDataMigration(old_data_version, new_data_version)
   -- TODO: when a migration is necessary, trigger it here or set a flag.
+  if old_data_version < "0.0.4" then
+    for k,v in pairs(global.pollution_sources) do
+      -- debug("migrating "..v.entity.name)
+      _,_,v.size = string.find(v.entity.name,"-([^-]*)$")
+      v.amount = v.amount*100
+      v.expiration = 0 -- old spills will expire when they are small enough
+      _,_,v.fluid = string.find(v.entity.name,"^chemical%-spill%-(.*)%-[^-]*$")
+      -- debug(v.size.." "..v.amount.." "..v.expiration)
+    end
+  end
 end
 
 local function onLoad()
