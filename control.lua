@@ -99,7 +99,7 @@ end
 
 -- create one-time pollution based on the corpse/remnant definition of an entity
 local function corpsesPollution(entity_name,surface,position)
-  if game.entity_prototypes and game.entity_prototypes[entity_name].corpses then
+  if game.entity_prototypes and game.entity_prototypes[entity_name] and game.entity_prototypes[entity_name].corpses then
     for cn,cep in pairs(game.entity_prototypes[entity_name].corpses) do
       -- small remnants have size 1, medium 4, large 9
       local corpse_size = bounding_box_area(cep.selection_box)
