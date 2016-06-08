@@ -140,14 +140,16 @@ end
 
 local function checkForDataMigration(old_data_version, new_data_version)
   -- TODO: when a migration is necessary, trigger it here or set a flag.
-  if old_data_version < "0.0.4" then
-    for k,v in pairs(global.pollution_sources) do
-      -- debug("migrating "..v.entity.name)
-      _,_,v.size = string.find(v.entity.name,"-([^-]*)$")
-      v.amount = v.amount*100
-      v.expiration = 0 -- old spills will expire when they are small enough
-      _,_,v.fluid = string.find(v.entity.name,"^chemical%-spill%-(.*)%-[^-]*$")
-      -- debug(v.size.." "..v.amount.." "..v.expiration)
+  if old_data_version == nil or old_data_version < "0.0.4" then
+    if global.pollution_sources then
+      for k,v in pairs(global.pollution_sources) do
+        -- debug("migrating "..v.entity.name)
+        _,_,v.size = string.find(v.entity.name,"-([^-]*)$")
+        v.amount = v.amount*100
+        v.expiration = 0 -- old spills will expire when they are small enough
+        _,_,v.fluid = string.find(v.entity.name,"^chemical%-spill%-(.*)%-[^-]*$")
+        -- debug(v.size.." "..v.amount.." "..v.expiration)
+      end
     end
   end
 end
