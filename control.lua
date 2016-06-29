@@ -1,7 +1,7 @@
 require "config"
 
-local mod_version="0.0.4"
-local mod_data_version="0.0.4"
+local mod_version="0.13.0"
+local mod_data_version="0.13.0"
 
 -- local function debug(...)
 --   if game and game.players[1] then
@@ -113,9 +113,8 @@ local function remnantPollution(e)
   corpsesPollution(e.name,e.surface,e.position)
   -- create one-time pollution for anything inside the destroyed entity
   for inv_num=1,8 do
-    -- temporary workaround for lack of valid inventory index list in API
-    local noerr,inventory = pcall(e.get_inventory,inv_num)
-    if noerr then
+    local inventory = e.get_inventory(inv_num)
+    if inventory then
       for item_name,item_count in pairs(inventory.get_contents()) do
         corpsesPollution(item_name,e.surface,e.position)
       end
@@ -124,14 +123,12 @@ local function remnantPollution(e)
 end
 
 local function onEntityDied(event)
-  local e = event.entity
-  fluidSpill(e)
-  remnantPollution(e)
+  fluidSpill(event.entity)
+  remnantPollution(event.entity)
 end
 
 local function onEntityMined(event)
-  local e = event.entity
-  fluidSpill(e)
+  fluidSpill(event.entity)
 end
 
 local function checkForMigration(old_version, new_version)
@@ -154,11 +151,7 @@ local function checkForDataMigration(old_data_version, new_data_version)
   end
 end
 
-local function onLoad()
-  -- The only reason to have version/data_version is to trigger migrations, so do that here.
-  checkForMigration(global.version, mod_version)
-  checkForDataMigration(global.data_version, mod_data_version)
-
+local function onInit()
   -- After these lines, we can no longer check for migration.
   global.version=mod_version
   global.data_version=mod_data_version
@@ -166,9 +159,16 @@ local function onLoad()
   if not global.pollution_sources then global.pollution_sources = {} end
 end
 
-script.on_init(onLoad)
-script.on_configuration_changed(onLoad)
-script.on_load(onLoad)
+local function onConfigurationChanged()
+  -- The only reason to have version/data_version is to trigger migrations, so do that here.
+  checkForMigration(global.version, mod_version)
+  checkForDataMigration(global.data_version, mod_data_version)
+
+  onInit()
+end
+
+script.on_init(onInit)
+script.on_configuration_changed(onConfigurationChanged)
 
 script.on_event(defines.events.on_entity_died, onEntityDied)
 script.on_event(defines.events.on_preplayer_mined_item, onEntityMined)
