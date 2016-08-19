@@ -1,6 +1,6 @@
 require "config"
 
-local mod_version="0.13.0"
+local mod_version="0.13.1"
 local mod_data_version="0.13.0"
 
 -- local function debug(...)
@@ -100,11 +100,13 @@ end
 -- create one-time pollution based on the corpse/remnant definition of an entity
 local function corpsesPollution(entity_name,surface,position)
   if game.entity_prototypes and game.entity_prototypes[entity_name] and game.entity_prototypes[entity_name].corpses then
-    for cn,cep in pairs(game.entity_prototypes[entity_name].corpses) do
-      -- small remnants have size 1, medium 4, large 9
-      local corpse_size = bounding_box_area(cep.selection_box)
-      surface.pollute(position, corpse_size*corpse_size*100 * pollution_intensity)
-      break
+    if game.entity_prototypes[entity_name].type ~= "unit" then
+      for cn,cep in pairs(game.entity_prototypes[entity_name].corpses) do
+        -- small remnants have size 1, medium 4, large 9
+        local corpse_size = bounding_box_area(cep.selection_box)
+        surface.pollute(position, corpse_size*corpse_size*100 * pollution_intensity)
+        break
+      end
     end
   end
 end
