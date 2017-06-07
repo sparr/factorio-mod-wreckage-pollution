@@ -7,6 +7,12 @@ local mod_data_version = "0.13.0"
 --   end
 -- end
 
+-- Fluid types that will not make a spill
+local IGNORED_FLUIDS = {
+  ["steam"] = true,
+  ["water"] = true,
+}
+
 local function onTick(event)
   -- pollute once per second
   if event.tick % 60 == 41 then
@@ -67,7 +73,7 @@ local function fluidSpill(e)
   -- create a chemical spill for non-water fluids being destroyed
   if #e.fluidbox > 0 then
     for b = 1, #e.fluidbox do
-      if e.fluidbox[b] and e.fluidbox[b].type ~= "water" then
+      if e.fluidbox[b] and IGNORED_FLUIDS[e.fluidbox[b].type] ~= false then
         local spill_amount = e.fluidbox[b].amount
         local spill_size
         if spill_amount < settings.global['medium_spill_threshold'].value then
