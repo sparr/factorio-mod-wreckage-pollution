@@ -10,8 +10,14 @@ local mod_data_version = "0.13.0"
 -- Fluid types that will not make a spill
 local IGNORED_FLUIDS = {
   ["steam"] = true,
+}
+
+-- Fluids types that create a puddle, but don't pollute
+local NON_POLLUTANTS = {
   ["water"] = true,
 }
+
+
 
 local function onTick(event)
   -- pollute once per second
@@ -22,7 +28,13 @@ local function onTick(event)
         table.remove(global.pollution_sources, i)
       else
         -- debug("pollute! " .. source.entity.position.x .. "," .. source.entity.position.y .. " " .. source.amount * settings.global['pollution_evaporation'].value * settings.global['pollution_intensity'].value)
-        source.entity.surface.pollute(source.entity.position, source.amount * settings.global['pollution_evaporation'].value * settings.global['pollution_intensity'].value)
+
+        -- Decide whether we want to create pollution
+        if NON_POLLUTANTS[source.entity.type] ~= true then
+          -- Create pollution in proportion to the spill size
+          source.entity.surface.pollute(source.entity.position, source.amount * settings.global['pollution_evaporation'].value * settings.global['pollution_intensity'].value)
+        end
+
         source.amount = source.amount - source.amount * settings.global['pollution_evaporation'].value
 
         if source.size == "large" and source.amount < settings.global['large_spill_threshold'].value / 10.0 then
@@ -83,7 +95,16 @@ local function fluidSpill(e)
         else
           spill_size = 'large'
         end
-        spill_entity = e.surface.create_entity{name = 'chemical-spill-' .. e.fluidbox[b].type .. '-' .. spill_size, position = e.position, force = e.force}
+
+        -- Figure out if its a pollutant
+        local spill_type
+        if NON_POLLUTANTS[e.fluidbox[b].type] ~= true then
+          spill_type = 'chemical-spill'
+        else
+          spill_type = 'liquid-spill'
+        end
+
+        spill_entity = e.surface.create_entity{name = spill_type .. '-' .. e.fluidbox[b].type .. '-' .. spill_size, position = e.position, force = e.force}
         if spill_entity then
           -- debug(" create pollution source " .. spill_entity.position.x .. "," .. spill_entity.position.y .. " " .. spill_amount)
           global.pollution_sources[#global.pollution_sources + 1] = {

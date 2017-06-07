@@ -8,21 +8,38 @@ local spill_sizes = {
   large =3
 }
 
+-- liquids that create non-polluting spills
+local non_pollutants = {
+  ["water"] = true,
+}
+
+
+
 for name, proto in pairs(data.raw.fluid) do
   for sizename, size in pairs(spill_sizes) do
+    -- See what kind of entity this liquid gets
+    local spill_type
+    if non_pollutants[name] == true then
+      spill_type = 'liquid-spill'
+    else
+      spill_type = 'chemical-spill'
+    end
+
     data:extend(
       {
         {
           type = "simple-entity",
-          name = "chemical-spill-" .. proto.name .. '-' .. sizename,
+          name = spill_type .. "-" .. proto.name .. '-' .. sizename,
           flags = {"placeable-neutral", "placeable-off-grid", "not-on-map"},
           icon = "__wreckage-pollution__/graphics/entity/chemical-spill-" .. sizename .. ".png",
           subgroup = "chemical-spill",
           order = "d[chemical-spill]-a[" .. proto.name .. "]-a[" .. sizename .. "]",
           selection_box = {{-size, -size}, {size, size}},
           selectable_in_game = true,
-          localised_name = {"entity-name.chemical-spill-" .. sizename, {"fluid-name." .. proto.name}},
-          localised_description = {"entity-description.chemical-spill-" .. sizename, {"fluid-name." .. proto.name}},
+          collision_box = {{-size, -size}, {size, size}},
+          collision_mask = {"floor-layer"},
+          localised_name = {"entity-name." .. spill_type .. "-" .. sizename, {"fluid-name." .. proto.name}},
+          localised_description = {"entity-description." .. spill_type .. "-" .. sizename, {"fluid-name." .. proto.name}},
 
           render_layer = "decorative",
           pictures =
