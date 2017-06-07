@@ -20,7 +20,10 @@ for name, proto in pairs(data.raw.fluid) do
           subgroup = "chemical-spill",
           order = "d[chemical-spill]-a[" .. proto.name .. "]-a[" .. sizename .. "]",
           selection_box = {{-size, -size}, {size, size}},
-          selectable_in_game = false,
+          selectable_in_game = true,
+          localised_name = {"entity-name.chemical-spill-" .. sizename, {"fluid-name." .. proto.name}},
+          localised_description = {"entity-description.chemical-spill-" .. sizename, {"fluid-name." .. proto.name}},
+
           render_layer = "decorative",
           pictures =
           {
