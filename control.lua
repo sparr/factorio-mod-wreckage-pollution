@@ -29,10 +29,13 @@ local function onTick(event)
       else
         -- debug("pollute! " .. source.entity.position.x .. "," .. source.entity.position.y .. " " .. source.amount * settings.global['pollution_evaporation'].value * settings.global['pollution_intensity'].value)
 
+        local spill_type = 'chemical-spill'
         -- Decide whether we want to create pollution
-        if NON_POLLUTANTS[source.entity.type] ~= true then
+        if NON_POLLUTANTS[source.fluid] ~= true then
           -- Create pollution in proportion to the spill size
           source.entity.surface.pollute(source.entity.position, source.amount * settings.global['pollution_evaporation'].value * settings.global['pollution_intensity'].value)
+        else
+          spill_type = 'liquid-spill'
         end
 
         source.amount = source.amount - source.amount * settings.global['pollution_evaporation'].value
@@ -41,7 +44,7 @@ local function onTick(event)
           -- debug("shrinking "..source.entity.name)
           local old_entity = source.entity
           source.entity = old_entity.surface.create_entity{
-            name = 'chemical-spill-'..source.fluid..'-'.."medium",
+            name = spill_type..'-'..source.fluid..'-'.."medium",
             position = old_entity.position,
             force = old_entity.force
           }
@@ -53,7 +56,7 @@ local function onTick(event)
           -- debug("shrinking "..source.entity.name)
           local old_entity = source.entity
           source.entity = old_entity.surface.create_entity{
-            name = 'chemical-spill-'..source.fluid..'-'.."small",
+            name = spill_type..'-'..source.fluid..'-'.."small",
             position = old_entity.position,
             force = old_entity.force
           }
@@ -85,7 +88,7 @@ local function fluidSpill(e)
   -- create a chemical spill for non-water fluids being destroyed
   if #e.fluidbox > 0 then
     for b = 1, #e.fluidbox do
-      if e.fluidbox[b] and IGNORED_FLUIDS[e.fluidbox[b].type] ~= false then
+      if e.fluidbox[b] and IGNORED_FLUIDS[e.fluidbox[b].name] ~= false then
         local spill_amount = e.fluidbox[b].amount
         local spill_size
         if spill_amount < settings.global['medium_spill_threshold'].value then
@@ -98,20 +101,20 @@ local function fluidSpill(e)
 
         -- Figure out if its a pollutant
         local spill_type
-        if NON_POLLUTANTS[e.fluidbox[b].type] ~= true then
+        if NON_POLLUTANTS[e.fluidbox[b].name] ~= true then
           spill_type = 'chemical-spill'
         else
           spill_type = 'liquid-spill'
         end
 
-        spill_entity = e.surface.create_entity{name = spill_type .. '-' .. e.fluidbox[b].type .. '-' .. spill_size, position = e.position, force = e.force}
+        spill_entity = e.surface.create_entity{name = spill_type .. '-' .. e.fluidbox[b].name .. '-' .. spill_size, position = e.position, force = e.force}
         if spill_entity then
           -- debug(" create pollution source " .. spill_entity.position.x .. "," .. spill_entity.position.y .. " " .. spill_amount)
           global.pollution_sources[#global.pollution_sources + 1] = {
             entity = spill_entity,
             amount = spill_amount / 10.0, -- v0.15 multiplied fluid amounts by 10
             size = spill_size,
-            fluid = e.fluidbox[b].type,
+            fluid = e.fluidbox[b].name,
           }
         end
       end
@@ -196,7 +199,7 @@ script.on_init(onInit)
 script.on_configuration_changed(onConfigurationChanged)
 
 script.on_event(defines.events.on_entity_died, onEntityDied)
-script.on_event(defines.events.on_preplayer_mined_item, onEntityMined)
+script.on_event(defines.events.on_pre_player_mined_item, onEntityMined)
 script.on_event(defines.events.on_robot_pre_mined, onEntityMined)
 
 script.on_event(defines.events.on_tick, onTick)

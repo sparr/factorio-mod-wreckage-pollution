@@ -32,6 +32,7 @@ for name, proto in pairs(data.raw.fluid) do
           name = spill_type .. "-" .. proto.name .. '-' .. sizename,
           flags = {"placeable-neutral", "placeable-off-grid", "not-on-map"},
           icon = "__wreckage-pollution__/graphics/entity/chemical-spill-" .. sizename .. ".png",
+          icon_size = size * 64,
           subgroup = "chemical-spill",
           order = "d[chemical-spill]-a[" .. proto.name .. "]-a[" .. sizename .. "]",
           selection_box = {{-size, -size}, {size, size}},
