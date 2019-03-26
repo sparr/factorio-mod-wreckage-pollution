@@ -6,9 +6,9 @@ data:extend(
       setting_type = "runtime-global",
       per_user = "false",
       admin = "true",
-      default_value = 1.0,
+      default_value = 0.25,
       minimum_value = 0,
-      maximum_value = 10.0
+      maximum_value = 1.0
     },
     {
       type = "double-setting",
