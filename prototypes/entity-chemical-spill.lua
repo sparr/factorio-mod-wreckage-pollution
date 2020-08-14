@@ -13,8 +13,6 @@ local non_pollutants = {
   ["water"] = true,
 }
 
-
-
 for name, proto in pairs(data.raw.fluid) do
   for sizename, size in pairs(spill_sizes) do
     -- See what kind of entity this liquid gets

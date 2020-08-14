@@ -17,62 +17,69 @@ local NON_POLLUTANTS = {
   ["water"] = true,
 }
 
-
-
 local function onTick(event)
-  -- pollute once per second
-  if event.tick % 60 == 41 then
-    for i = #global.pollution_sources, 1, -1 do
-      local source = global.pollution_sources[i]
-      if not source.entity or not source.entity.valid then
-        table.remove(global.pollution_sources, i)
+  if #global.pollution_sources == 0 then return end
+  local n_sources = math.ceil(#global.pollution_sources / 60)
+  for n = 1, n_sources do
+    if global.pollution_index == 0 then global.pollution_index = #global.pollution_sources end
+
+    local source = global.pollution_sources[global.pollution_index]
+    if source.tick ~= nil and source.tick > event.tick - 60 then return end
+    if not source.entity or not source.entity.valid then
+      table.remove(global.pollution_sources, global.pollution_index)
+    else
+      source.tick = event.tick
+      local evap_amount = source.amount * settings.global['pollution_evaporation'].value
+      local pollute_amount = evap_amount * settings.global['pollution_intensity'].value
+
+      -- debug("pollute! " .. source.entity.position.x .. "," .. source.entity.position.y .. " " .. source.amount .. " " .. pollute_amount)
+
+      local spill_type = 'chemical-spill'
+      -- Decide whether we want to create pollution
+      if NON_POLLUTANTS[source.fluid] ~= true then
+        -- Create pollution in proportion to the spill size
+        source.entity.surface.pollute(source.entity.position, pollute_amount)
       else
-        -- debug("pollute! " .. source.entity.position.x .. "," .. source.entity.position.y .. " " .. source.amount * settings.global['pollution_evaporation'].value * settings.global['pollution_intensity'].value)
+        spill_type = 'liquid-spill'
+      end
 
-        local spill_type = 'chemical-spill'
-        -- Decide whether we want to create pollution
-        if NON_POLLUTANTS[source.fluid] ~= true then
-          -- Create pollution in proportion to the spill size
-          source.entity.surface.pollute(source.entity.position, source.amount * settings.global['pollution_evaporation'].value * settings.global['pollution_intensity'].value)
-        else
-          spill_type = 'liquid-spill'
-        end
+      source.amount = source.amount - evap_amount
 
-        source.amount = source.amount - source.amount * settings.global['pollution_evaporation'].value
+      if source.size == "large" and source.amount < settings.global['large_spill_threshold'].value / 10.0 then
+        -- debug("shrinking "..source.entity.name)
+        local old_entity = source.entity
+        source.entity = old_entity.surface.create_entity{
+          name = spill_type..'-'..source.fluid..'-'.."medium",
+          position = old_entity.position,
+          force = old_entity.force
+        }
+        source.size = "medium"
+        old_entity.destroy()
+      end
 
-        if source.size == "large" and source.amount < settings.global['large_spill_threshold'].value / 10.0 then
-          -- debug("shrinking "..source.entity.name)
-          local old_entity = source.entity
-          source.entity = old_entity.surface.create_entity{
-            name = spill_type..'-'..source.fluid..'-'.."medium",
-            position = old_entity.position,
-            force = old_entity.force
-          }
-          source.size = "medium"
-          old_entity.destroy()
-        end
+      if source.size == "medium" and source.amount < settings.global['medium_spill_threshold'].value / 10.0 then
+        -- debug("shrinking "..source.entity.name)
+        local old_entity = source.entity
+        source.entity = old_entity.surface.create_entity{
+          name = spill_type..'-'..source.fluid..'-'.."small",
+          position = old_entity.position,
+          force = old_entity.force
+        }
+        source.size = "small"
+        old_entity.destroy()
+      end
 
-        if source.size == "medium" and source.amount < settings.global['medium_spill_threshold'].value / 10.0then
-          -- debug("shrinking "..source.entity.name)
-          local old_entity = source.entity
-          source.entity = old_entity.surface.create_entity{
-            name = spill_type..'-'..source.fluid..'-'.."small",
-            position = old_entity.position,
-            force = old_entity.force
-          }
-          source.size = "small"
-          old_entity.destroy()
-        end
-
-        -- get rid of pollution sources producing less than 0.1 per second
-        if source.amount < 0.1 / settings.global['pollution_evaporation'].value then
-          -- debug("destroying "..source.entity.name)
-          source.entity.destroy()
-          table.remove(global.pollution_sources, i)
-        end
+      -- get rid of pollution sources producing less than 0.1 per second
+      if source.amount < 0.1 / settings.global['pollution_evaporation'].value then
+        -- debug("destroying "..source.entity.name)
+        source.entity.destroy()
+        table.remove(global.pollution_sources, i)
       end
     end
+
+    global.pollution_index = global.pollution_index - 1
   end
+
 end
 
 local function bounding_box_area(box)
@@ -185,6 +192,7 @@ local function onInit()
   global.data_version = mod_data_version
 
   if not global.pollution_sources then global.pollution_sources = {} end
+  if not global.pollution_index then global.pollution_index = #global.pollution_sources end
 end
 
 local function onConfigurationChanged()
