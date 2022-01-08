@@ -1,0 +1,70 @@
+---------------------------------------------------------------------------------------------------
+Version: 1.1.0
+Date: ????
+  Bugfixes:
+    - Resolve non-evaporation with multiple spills
+  Other:
+    - Update for Factorio 1.1
+---------------------------------------------------------------------------------------------------
+Version: 0.18.0
+Date: 2020-09-14
+  Optimizations:
+    - Distribute handling across ticks instead of just once per second
+  Other:
+    - Update for Factorio 0.18 and 1.0
+---------------------------------------------------------------------------------------------------
+Version: 0.16.0
+Date: 2018-03-25
+  Bugfixes:
+    - Yep
+  Other:
+    - Update for Factorio 0.16
+---------------------------------------------------------------------------------------------------
+Version: 0.15.0
+Date: 2017-04-27
+  Bugfixes:
+    - Remove pollution from biter corpses
+  Features:
+    - Settings to control spill sizes and pollution amounts
+  Other:
+    - Update for Factorio 0.15
+---------------------------------------------------------------------------------------------------
+Version: 0.13.0
+Date: 2016-06-28
+  Other:
+    - Update for Factorio 0.13
+---------------------------------------------------------------------------------------------------
+Version: 0.0.5
+Date: 2016-06-08
+  Bugfixes:
+    - Yep
+---------------------------------------------------------------------------------------------------
+Version: 0.0.4
+Date: 2016-06-06
+  Features:
+    - Spills visually shrink over time
+  Changes:
+    - Tiny spills last longer
+  Bugfixes:
+    - Yep
+---------------------------------------------------------------------------------------------------
+Version: 0.0.3
+Date: 2016-06-05
+  Bugfixes:
+    - Yep
+---------------------------------------------------------------------------------------------------
+Version: 0.0.2
+Date: 2016-06-04
+  Features:
+    - Colorized fluid spills to match fluids
+  Bugfixes:
+    - Mined fluid containers spill as intended
+---------------------------------------------------------------------------------------------------
+Version: 0.0.1
+Date: 2016-06-04
+  Features:
+    - Destroyed entities cause immediate pollution
+    - Destroyed or mined fluid containers spill their fluid, non-water evaporates to pollution
+  Other:
+    - Initial version of mod, for Factorio 0.12
+

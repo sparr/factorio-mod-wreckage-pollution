@@ -1,9 +1,11 @@
-local mod_version = "0.15.0"
+local mod_version = "1.1.0"
 local mod_data_version = "0.13.0"
 
+-- dx = 1
 -- local function debug(...)
 --   if game and game.players[1] then
---     game.players[1].print(...)
+--     game.players[1].print(dx .. " " .. ...)
+--     dx = dx + 1 
 --   end
 -- end
 
@@ -19,24 +21,33 @@ local NON_POLLUTANTS = {
 
 local function onTick(event)
   if #global.pollution_sources == 0 then return end
-  local n_sources = math.ceil(#global.pollution_sources / 60)
-  for n = 1, n_sources do
-    if global.pollution_index == 0 then global.pollution_index = #global.pollution_sources end
 
+  -- bail early if it's too soon to process the next source
+  if global.pollution_sources[global.pollution_index] and global.pollution_sources[global.pollution_index].tick > event.tick - 60 then
+    return
+  end
+
+  -- process n sources per tick, to spread out the load
+  local n_sources = math.ceil(#global.pollution_sources / 60)
+
+  for n = 1, n_sources do
     local source = global.pollution_sources[global.pollution_index]
-    if source.tick ~= nil and source.tick > event.tick - 60 then return end
-    if not source.entity or not source.entity.valid then
+    if not source or not source.entity or not source.entity.valid then
       table.remove(global.pollution_sources, global.pollution_index)
+      if #global.pollution_sources == 0 then return end
+      if global.pollution_index > #global.pollution_sources then
+        global.pollution_index = #global.pollution_sources
+      end
     else
+      if source.tick > event.tick - 60 then return end
       source.tick = event.tick
       local evap_amount = source.amount * settings.global['pollution_evaporation'].value
       local pollute_amount = evap_amount * settings.global['pollution_intensity'].value
 
-      -- debug("pollute! " .. source.entity.position.x .. "," .. source.entity.position.y .. " " .. source.amount .. " " .. pollute_amount)
-
       local spill_type = 'chemical-spill'
       -- Decide whether we want to create pollution
       if NON_POLLUTANTS[source.fluid] ~= true then
+        -- debug("pollute! " .. source.entity.position.x .. "," .. source.entity.position.y .. " " .. source.fluid .. " " .. source.amount .. " " .. pollute_amount)
         -- Create pollution in proportion to the spill size
         source.entity.surface.pollute(source.entity.position, pollute_amount)
       else
@@ -73,11 +84,11 @@ local function onTick(event)
       if source.amount < 0.1 / settings.global['pollution_evaporation'].value then
         -- debug("destroying "..source.entity.name)
         source.entity.destroy()
-        table.remove(global.pollution_sources, i)
+        table.remove(global.pollution_sources, global.pollution_index)
       end
     end
 
-    global.pollution_index = global.pollution_index - 1
+    global.pollution_index = (global.pollution_index - 2) % #global.pollution_sources + 1
   end
 
 end
@@ -95,7 +106,7 @@ local function fluidSpill(e)
   -- create a chemical spill for non-water fluids being destroyed
   if #e.fluidbox > 0 then
     for b = 1, #e.fluidbox do
-      if e.fluidbox[b] and IGNORED_FLUIDS[e.fluidbox[b].name] ~= false then
+      if e.fluidbox[b] and IGNORED_FLUIDS[e.fluidbox[b].name] ~= true then
         local spill_amount = e.fluidbox[b].amount
         local spill_size
         if spill_amount < settings.global['medium_spill_threshold'].value then
@@ -122,6 +133,7 @@ local function fluidSpill(e)
             amount = spill_amount / 10.0, -- v0.15 multiplied fluid amounts by 10
             size = spill_size,
             fluid = e.fluidbox[b].name,
+            tick = game.tick
           }
         end
       end
