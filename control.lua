@@ -1,11 +1,11 @@
-local mod_version = "1.1.0"
+local mod_version = "1.1.1"
 local mod_data_version = "0.13.0"
 
 -- dx = 1
 -- local function debug(...)
 --   if game and game.players[1] then
 --     game.players[1].print(dx .. " " .. ...)
---     dx = dx + 1 
+--     dx = dx + 1
 --   end
 -- end
 
@@ -88,7 +88,11 @@ local function onTick(event)
       end
     end
 
-    global.pollution_index = (global.pollution_index - 2) % #global.pollution_sources + 1
+    if #global.pollution_sources > 0 then
+      global.pollution_index = (global.pollution_index - 2) % #global.pollution_sources + 1
+    else
+      global.pollution_index = 0
+    end
   end
 
 end
