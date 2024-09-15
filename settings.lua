@@ -19,7 +19,7 @@ data:extend(
     {
       type = "int-setting",
       name = "medium_spill_threshold",
-      setting_type = "runtime-global",
+      setting_type = "startup",
       default_value = 1000,
       minimum_value = 100,
       maximum_value = 10000
@@ -27,10 +27,10 @@ data:extend(
     {
       type = "int-setting",
       name = "large_spill_threshold",
-      setting_type = "runtime-global",
+      setting_type = "startup",
       default_value = 10000,
       minimum_value = 1000,
       maximum_value = 100000
     }
-  }
+  }--[=[@as data.AnyModSetting[]]=]
 )
