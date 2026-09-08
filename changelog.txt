@@ -1,4 +1,16 @@
 ---------------------------------------------------------------------------------------------------
+Version: 2.1.0
+Date: 2026-09-08
+  Other:
+    - Update for Factorio 2.1
+  Bugfixes:
+    - Destroying anything that holds no fluid no longer breaks the game, which in 2.0 meant
+      every chest, belt and biter
+    - Loading a save made with an older version no longer breaks the game
+    - Destroying a full chest pollutes for what was inside it again
+  Changes:
+    - A destroyed fluid wagon or fluid turret now spills what it was carrying
+---------------------------------------------------------------------------------------------------
 Version: 1.2.0
 Date: 2024-09-15
   Features:
