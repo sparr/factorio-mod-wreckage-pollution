@@ -103,6 +103,34 @@ function spill.containers(recipe_prototypes)
   return held
 end
 
+---@class Harvest
+---@field item string the fruit a plant gives up
+---@field amount number how much of it one plant yields
+
+---What a plant yields when it is taken, out of a mining results list. The first item in
+---the list is the fruit; a plant that yields nothing yields nothing.
+---
+---Pure, so both stages can ask and the unit tier can check without a game. The data stage
+---calls its list `results` and the control stage calls it `products`; the caller hands
+---over whichever it has.
+---@param results table[]?
+---@return Harvest?
+function spill.harvest(results)
+  for _, result in pairs(results or {}) do
+    if result.type == "item" and result.name then
+      local amount = result.amount or result.amount_max or result.amount_min
+      if amount and amount > 0 then
+        return { item = result.name, amount = amount }
+      end
+    end
+  end
+  return nil
+end
+
+--- What colour a spill of something that is not a fluid is drawn in, when whatever ships
+--- it offers none.
+spill.DEFAULT_COLOUR = { r = 0.6, g = 0.6, b = 0.5, a = 1 }
+
 ---@class SpillBox
 ---@field left_top {x: number, y: number}
 ---@field right_bottom {x: number, y: number}

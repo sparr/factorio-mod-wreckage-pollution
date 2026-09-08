@@ -145,3 +145,32 @@ describe("which items are containers of fluid", function()
         assert.is_nil(held["cell"])
     end)
 end)
+
+describe("what a plant yields", function()
+    it("reads the fruit and the count off the results", function()
+        assert.are.same({ item = "yumako", amount = 50 },
+            spill.harvest{ { type = "item", name = "yumako", amount = 50 } })
+    end)
+
+    -- a plant's results can carry a seed at some small chance alongside the fruit; the
+    -- fruit is the one that lands on the ground
+    it("takes the first item, past anything that is not one", function()
+        assert.are.same({ item = "yumako", amount = 50 }, spill.harvest{
+            { type = "fluid", name = "sap", amount = 5 },
+            { type = "item", name = "yumako", amount = 50 },
+            { type = "item", name = "yumako-seed", amount = 1 },
+        })
+    end)
+
+    it("copes with a range rather than a fixed amount", function()
+        assert.are.same({ item = "berry", amount = 9 },
+            spill.harvest{ { type = "item", name = "berry", amount_max = 9 } })
+    end)
+
+    it("answers nothing for a plant that yields nothing", function()
+        assert.is_nil(spill.harvest(nil))
+        assert.is_nil(spill.harvest{})
+        assert.is_nil(spill.harvest{ { type = "fluid", name = "sap", amount = 5 } })
+        assert.is_nil(spill.harvest{ { type = "item", name = "nothing", amount = 0 } })
+    end)
+end)

@@ -166,6 +166,38 @@ local function heldFluids()
   return containers
 end
 
+--- The fruit each plant gives up, and the set of items that counts as fruit. A felled
+--- plant spills its fruit, and so does anything destroyed while holding some.
+local by_plant, is_fruit = nil, nil
+local function learnFruit()
+  if by_plant then return end
+  by_plant, is_fruit = {}, {}
+  for _, plant in pairs(prototypes.get_entity_filtered{{filter = "type", type = "plant"}}) do
+    local mineable = plant.mineable_properties
+    local harvest = mineable and spill.harvest(mineable.products)
+    if harvest then
+      by_plant[plant.name] = harvest
+      is_fruit[harvest.item] = true
+    end
+  end
+end
+
+---What this prototype yields if it is a plant, or nil if it is not one.
+---@param prototype LuaEntityPrototype
+---@return Harvest?
+local function fruitOf(prototype)
+  learnFruit()
+  return by_plant[prototype.name]
+end
+
+---Whether this item is a fruit some plant gives up.
+---@param item_name string
+---@return boolean
+local function isFruit(item_name)
+  learnFruit()
+  return is_fruit[item_name] == true
+end
+
 ---@param e LuaEntity
 local function fluidSpill(e)
   -- 2.1 removed LuaEntity.fluidbox. fluids_count answers for every entity, so a chest or
@@ -181,23 +213,33 @@ local function fluidSpill(e)
     end
   end
 
-  -- and whatever was sitting in barrels inside it, gathered per fluid so a chest of
-  -- fifty barrels leaves one spill rather than fifty
-  local from_containers = {}
+  -- A plant taken any way other than by harvesting gives up its fruit on the ground. An
+  -- agricultural tower harvesting one raises its own events, which this mod does not
+  -- answer, so a picked crop is not also a spilled one.
+  local harvest = fruitOf(e.prototype)
+  if harvest then
+    createSpill(e.surface, e.position, e.force, harvest.item, harvest.amount)
+  end
+
+  -- and whatever was sitting inside it: barrels of fluid, and fruit. Gathered per thing
+  -- so a chest of fifty barrels leaves one spill rather than fifty.
+  local from_contents = {}
   for inv_num--[[@type defines.inventory]] = 1, e.get_max_inventory_index() do
     local inventory = e.get_inventory(inv_num)
     if inventory then
       for _, item in pairs(inventory.get_contents()) do
         local held = heldFluids()[item.name]
         if held then
-          from_containers[held.fluid] =
-            (from_containers[held.fluid] or 0) + held.amount * item.count
+          from_contents[held.fluid] =
+            (from_contents[held.fluid] or 0) + held.amount * item.count
+        elseif isFruit(item.name) then
+          from_contents[item.name] = (from_contents[item.name] or 0) + item.count
         end
       end
     end
   end
-  for fluid_name, amount in pairs(from_containers) do
-    createSpill(e.surface, e.position, e.force, fluid_name, amount)
+  for what, amount in pairs(from_contents) do
+    createSpill(e.surface, e.position, e.force, what, amount)
   end
 end
 
@@ -207,13 +249,10 @@ end
 ---@param pollutant string
 ---@return number
 local function wreckEmission(prototype, pollutant)
-  -- A plant is judged by what harvesting it releases, which is the whole of the answer
-  -- somewhere like Gleba: felling a yumako tree gives up its spores, and a wrecked
-  -- assembler gives up none, because an assembler is not what makes spores there.
-  local harvest = prototype.harvest_emissions
-  if harvest then
-    return (harvest[pollutant] or 0) * settings.global['pollution_intensity'].value
-  end
+  -- Somewhere that deals in something other than pollution, wreckage puts nothing into
+  -- the air by itself. On Gleba the spores come from the plants, and an agricultural
+  -- tower already answers for the ones it harvests; a felled plant leaves its fruit on
+  -- the ground instead, and that gives off spores as it rots like any other spill.
   if pollutant ~= "pollution" then return 0 end
 
   -- Nothing a fight produces counts. Biter corpses were already spared; trees are spared

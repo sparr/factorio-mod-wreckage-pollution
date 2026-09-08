@@ -41,12 +41,15 @@ describe("a surface that deals in no pollutant", function()
     end)
 end)
 
-describe("Gleba, which deals in spores", function()
+describe("Gleba, where the spores come from the plants", function()
     local function gleba()
         return game.planets.gleba.surface or game.planets.gleba.create_surface()
     end
 
-    it("counts a felled plant, which is what makes spores there", function()
+    -- An agricultural tower raises its own events when it picks a crop, and already puts
+    -- the spores for that into the air. This mod answers none of those events, so a
+    -- harvested plant is not also a spilled one.
+    it("leaves a felled plant's fruit on the ground", function()
         local surface = gleba()
         assert.are.equal("spores", surface.pollutant_type.name)
         local arena = world.arena(surface)
@@ -54,12 +57,31 @@ describe("Gleba, which deals in spores", function()
             name = "yumako-tree", position = arena.centre, force = "neutral" }
         assert.is_not_nil(plant, "could not plant a yumako tree")
         plant.die()
-        assert.is_true(surface.get_pollution(arena.centre) > 0,
-            "felling a yumako tree should give up its spores")
+        assert.are.same({ ["chemical-spill-yumako-small"] = 1 }, world.spills(arena),
+            "felling a yumako tree should leave its fruit on the ground")
     end)
 
-    -- an assembler is not what makes spores on Gleba, so wrecking one makes none
-    it("does not count a wrecked machine", function()
+    it("does the same for a jellystem", function()
+        local arena = world.arena(gleba())
+        local plant = arena.surface.create_entity{
+            name = "jellystem", position = arena.centre, force = "neutral" }
+        assert.is_not_nil(plant, "could not plant a jellystem")
+        plant.die()
+        assert.are.same({ ["chemical-spill-jellynut-small"] = 1 }, world.spills(arena))
+    end)
+
+    it("spills the fruit out of a destroyed container", function()
+        local arena = world.arena(gleba())
+        local chest = arena.surface.create_entity{
+            name = "steel-chest", position = arena.centre, force = "player" }
+        assert.is_not_nil(chest)
+        chest.insert{ name = "yumako", count = 100 }
+        chest.die()
+        assert.are.same({ ["chemical-spill-yumako-small"] = 1 }, world.spills(arena))
+    end)
+
+    -- the plants make the spores there, so nothing else does
+    it("puts nothing into the air for a wrecked machine", function()
         local surface = gleba()
         local arena = world.arena(surface)
         local machine = surface.create_entity{
@@ -68,6 +90,21 @@ describe("Gleba, which deals in spores", function()
         machine.die()
         assert.are.equal(0, surface.get_pollution(arena.centre),
             "a furnace does not make spores, so wrecking one should not either")
+    end)
+
+    -- but the fruit rotting does, the same way any other spill gives off what it is made
+    -- of as it goes
+    it("gives off spores as the spilled fruit goes", function()
+        local arena = world.arena(gleba())
+        local plant = arena.surface.create_entity{
+            name = "yumako-tree", position = arena.centre, force = "neutral" }
+        plant.die()
+        local first
+        after_ticks(2, function() first = arena.surface.get_pollution(arena.centre) end)
+        after_ticks(300, function()
+            assert.is_true(arena.surface.get_pollution(arena.centre) > first,
+                "spilled fruit should be giving off spores as it rots")
+        end)
     end)
 
     it("still leaves a spill of what was in a tank", function()

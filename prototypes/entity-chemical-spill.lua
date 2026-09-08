@@ -11,7 +11,31 @@ local spill_sizes = {
 
 local spill = require("lib.spill")
 
+--- Everything that can be spilled, and the colour to draw it in.
+---
+--- Fluids come with a colour of their own. A plant's fruit does not, so it borrows the
+--- tint the game already uses to show that plant on an agricultural tower, which is the
+--- colour a player associates with it.
+local spillable = {}
 for name, proto in pairs(data.raw.fluid) do
+  spillable[name] = { colour = proto.base_color, source = "fluid" }
+end
+for _, plant in pairs(data.raw.plant or {}) do
+  local harvest = spill.harvest(plant.minable and plant.minable.results)
+  if harvest and not spillable[harvest.item] then
+    local tint = plant.agricultural_tower_tint
+    spillable[harvest.item] = {
+      colour = tint and tint.primary or spill.DEFAULT_COLOUR,
+      source = "plant",
+    }
+  end
+end
+
+for name, spillable_data in pairs(spillable) do
+  local proto = { name = name, base_color = spillable_data.colour }
+  -- a fluid is named out of the fluid list, a fruit out of the item list
+  local what_spilled = { (spillable_data.source == "fluid" and "fluid-name." or "item-name.")
+                         .. name }
   for size_name, spill_data in pairs(spill_sizes) do
     local size = spill_data.size
     -- See what kind of entity this liquid gets
@@ -34,8 +58,8 @@ for name, proto in pairs(data.raw.fluid) do
           -- floor. A spill is decoration: it lies on the ground and must not stop
           -- anything being built on top of it.
           collision_mask = {layers = {floor = true}},
-          localised_name = {"entity-name." .. spill_type .. "-" .. size_name, {"fluid-name." .. proto.name}},
-          localised_description = {"entity-description." .. spill_type .. "-" .. size_name, {"fluid-name." .. proto.name}},
+          localised_name = {"entity-name." .. spill_type .. "-" .. size_name, what_spilled},
+          localised_description = {"entity-description." .. spill_type .. "-" .. size_name, what_spilled},
           max_health = spill_data.max_amount,
 
           render_layer = "decorative",
@@ -45,7 +69,7 @@ for name, proto in pairs(data.raw.fluid) do
               filename = "__wreckage-pollution__/graphics/entity/chemical-spill-" .. size_name .. ".png",
               width = size * 64,
               height = size * 64,
-              tint = proto.base_color,
+              tint = spillable_data.colour,
             }
           }
         },
