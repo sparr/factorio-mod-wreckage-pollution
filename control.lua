@@ -194,28 +194,49 @@ local function fluidSpill(e)
   end
 end
 
--- create one-time pollution based on the corpse/remnant definition of an entity
-local function corpsesPollution(entity_name, surface, position)
-  local prototype = prototypes.entity[entity_name]
-  if prototype and prototype.corpses then
-    -- pollute for everything except biter corpses
-    if prototype.type ~= "unit" then
-      for cn, cep in pairs(prototype.corpses) do
-        -- small remnants have size 1, medium 4, large 9
-        local corpse_size = spill.bounding_box_area(cep.selection_box)
-        -- debug("pollute! " .. cn .. " " .. position.x .. "," .. position.y .. " " .. corpse_size * settings.global['pollution_intensity'].value * 100)
-        surface.pollute(position, corpse_size * settings.global['pollution_intensity'].value * 20)
-        break
-      end
-    end
+--- How much a destroyed thing puts into the air on a surface dealing in the named
+--- pollutant. Zero means it contributes nothing at all.
+---@param prototype LuaEntityPrototype
+---@param pollutant string
+---@return number
+local function wreckEmission(prototype, pollutant)
+  -- A plant is judged by what harvesting it releases, which is the whole of the answer
+  -- somewhere like Gleba: felling a yumako tree gives up its spores, and a wrecked
+  -- assembler gives up none, because an assembler is not what makes spores there.
+  local harvest = prototype.harvest_emissions
+  if harvest then
+    return (harvest[pollutant] or 0) * settings.global['pollution_intensity'].value
   end
+  if pollutant ~= "pollution" then return 0 end
+
+  -- Nothing a fight produces counts. Biter corpses were already spared; trees are spared
+  -- now too, because biters knock them down in places nobody has been, and a forest is
+  -- what takes pollution out of the air rather than what puts it in.
+  if prototype.type == "unit" or prototype.type == "tree" then return 0 end
+
+  if not prototype.corpses then return 0 end
+  for _, corpse in pairs(prototype.corpses) do
+    -- small remnants have size 1, medium 4, large 9
+    return spill.bounding_box_area(corpse.selection_box)
+      * settings.global['pollution_intensity'].value * 20
+  end
+  return 0
+end
+
+-- create one-time pollution based on the corpse/remnant definition of an entity
+local function corpsesPollution(entity_name, surface, position, pollutant)
+  local prototype = prototypes.entity[entity_name]
+  if not prototype then return end
+  local amount = wreckEmission(prototype, pollutant)
+  if amount > 0 then surface.pollute(position, amount) end
 end
 
 ---Create pollution for an entity dying and everything destroyed in its inventories
 ---@param e LuaEntity
 local function remnantPollution(e)
-  if not pollutant_of(e.surface) then return end
-  corpsesPollution(e.name, e.surface, e.position)
+  local pollutant = pollutant_of(e.surface)
+  if not pollutant then return end
+  corpsesPollution(e.name, e.surface, e.position, pollutant)
   -- create one-time pollution for anything inside the destroyed entity
   for inv_num--[[@type defines.inventory]] = 1, e.get_max_inventory_index() do
     local inventory = e.get_inventory(inv_num)
@@ -224,7 +245,7 @@ local function remnantPollution(e)
       -- {name, count, quality} records
       for _, item in pairs(inventory.get_contents()) do
         -- TODO handle items that don't have same name entities
-        corpsesPollution(item.name, e.surface, e.position)
+        corpsesPollution(item.name, e.surface, e.position, pollutant)
       end
     end
   end
