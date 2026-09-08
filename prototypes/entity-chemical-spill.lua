@@ -39,7 +39,10 @@ for name, proto in pairs(data.raw.fluid) do
           selection_box = {{-size, -size}, {size, size}},
           selectable_in_game = true,
           collision_box = {{-size, -size}, {size, size}},
-          collision_mask = {"floor-layer"},
+          -- 2.0 turned collision layers into prototypes and renamed floor-layer to
+          -- floor. A spill is decoration: it lies on the ground and must not stop
+          -- anything being built on top of it.
+          collision_mask = {layers = {floor = true}},
           localised_name = {"entity-name." .. spill_type .. "-" .. size_name, {"fluid-name." .. proto.name}},
           localised_description = {"entity-description." .. spill_type .. "-" .. size_name, {"fluid-name." .. proto.name}},
           max_health = spill_data.max_amount,
