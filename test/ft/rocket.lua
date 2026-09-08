@@ -97,11 +97,14 @@ describe("a platform put up by an actual rocket", function()
                 :format(loaded_at, tostring(arrived_at)))
             assert.is_nil(built.pollutant_type, "a platform should have no pollutant")
 
-            -- and now the thing this whole fixture exists for: break something up there
+            -- and now the thing this whole fixture exists for: break something up there.
+            -- A platform deals in no pollutant, so the mod leaves it alone; what is being
+            -- checked is that it does so without falling over on a surface that arrived
+            -- by rocket rather than by script.
             local arena = world.arena(built)
             world.tank(arena, "water", 20000).die()
-            assert.are.same({ ["liquid-spill-water-large"] = 1 }, world.spills(arena),
-                "a tank destroyed on a launched platform should still spill")
+            assert.are.same({}, world.spills(arena),
+                "a platform deals in nothing, so nothing should be left behind")
 
             local chest = arena.surface.create_entity{
                 name = "steel-chest", position = arena.centre, force = "player" }

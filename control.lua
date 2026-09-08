@@ -31,6 +31,19 @@ local function setUpStorage()
   storage.pollution_index = storage.pollution_index or #storage.pollution_sources
 end
 
+--- What this surface deals in, or nil if it deals in nothing. Vulcanus, Fulgora, Aquilo
+--- and every space platform answer nil: pollute() there is a silent no-op, so a spill
+--- would sit on the books being processed for nothing, for good.
+---
+--- Asked each time rather than remembered, because a mod can turn a surface's pollutant
+--- on or off through override_pollution_type.
+---@param surface LuaSurface
+---@return string?
+local function pollutant_of(surface)
+  local pollutant = surface.pollutant_type
+  return pollutant and pollutant.name or nil
+end
+
 local function onTick(event)
   if #storage.pollution_sources == 0 then return end
 
@@ -49,6 +62,13 @@ local function onTick(event)
         table.remove(storage.pollution_sources, storage.pollution_index)
         removed = true
       end
+    elseif not pollutant_of(source.entity.surface) then
+      -- Nothing here evaporates a spill or takes its pollution, so leaving it on the
+      -- books would leave it on the ground for good. Saves made before this rule can
+      -- still be carrying some.
+      source.entity.destroy()
+      table.remove(storage.pollution_sources, storage.pollution_index)
+      removed = true
     else
       if source.tick > event.tick - 60 then return end
       source.tick = event.tick
@@ -146,6 +166,7 @@ local function fluidSpill(e)
   -- off one was an error that took the mod down with it. It also counts fluid held
   -- outside a fluidbox proper, so a destroyed fluid wagon or fluid turret now spills what
   -- it was carrying, which it never used to.
+  if not pollutant_of(e.surface) then return end
   for b = 1, e.fluids_count do
     local fluid = e.get_fluid(b)
     if fluid then
@@ -193,6 +214,7 @@ end
 ---Create pollution for an entity dying and everything destroyed in its inventories
 ---@param e LuaEntity
 local function remnantPollution(e)
+  if not pollutant_of(e.surface) then return end
   corpsesPollution(e.name, e.surface, e.position)
   -- create one-time pollution for anything inside the destroyed entity
   for inv_num--[[@type defines.inventory]] = 1, e.get_max_inventory_index() do
@@ -233,6 +255,7 @@ if script.active_mods["factorio-test"] and script.active_mods["wp-tests"] then
     "test.ft.spilling",
     "test.ft.evaporation",
     "test.ft.surfaces",
+    "test.ft.planets",
     "test.ft.barrels",
     "test.ft.rocket",
   }, {
