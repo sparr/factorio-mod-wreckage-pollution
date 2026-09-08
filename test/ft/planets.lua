@@ -46,6 +46,16 @@ describe("Gleba, where the spores come from the plants", function()
         return game.planets.gleba.surface or game.planets.gleba.create_surface()
     end
 
+    --- A plant made by script starts growing from nothing, and an unripe one has no fruit
+    --- on it to lose.
+    local function ripe_plant(arena, name)
+        local plant = arena.surface.create_entity{
+            name = name, position = arena.centre, force = "neutral" }
+        assert.is_not_nil(plant, "could not plant a " .. name)
+        plant.tick_grown = 1
+        return plant
+    end
+
     -- An agricultural tower raises its own events when it picks a crop, and already puts
     -- the spores for that into the air. This mod answers none of those events, so a
     -- harvested plant is not also a spilled one.
@@ -53,20 +63,14 @@ describe("Gleba, where the spores come from the plants", function()
         local surface = gleba()
         assert.are.equal("spores", surface.pollutant_type.name)
         local arena = world.arena(surface)
-        local plant = surface.create_entity{
-            name = "yumako-tree", position = arena.centre, force = "neutral" }
-        assert.is_not_nil(plant, "could not plant a yumako tree")
-        plant.die()
+        ripe_plant(arena, "yumako-tree").die()
         assert.are.same({ ["chemical-spill-yumako-small"] = 1 }, world.spills(arena),
             "felling a yumako tree should leave its fruit on the ground")
     end)
 
     it("does the same for a jellystem", function()
         local arena = world.arena(gleba())
-        local plant = arena.surface.create_entity{
-            name = "jellystem", position = arena.centre, force = "neutral" }
-        assert.is_not_nil(plant, "could not plant a jellystem")
-        plant.die()
+        ripe_plant(arena, "jellystem").die()
         assert.are.same({ ["chemical-spill-jellynut-small"] = 1 }, world.spills(arena))
     end)
 
@@ -96,9 +100,7 @@ describe("Gleba, where the spores come from the plants", function()
     -- of as it goes
     it("gives off spores as the spilled fruit goes", function()
         local arena = world.arena(gleba())
-        local plant = arena.surface.create_entity{
-            name = "yumako-tree", position = arena.centre, force = "neutral" }
-        plant.die()
+        ripe_plant(arena, "yumako-tree").die()
         local first
         after_ticks(2, function() first = arena.surface.get_pollution(arena.centre) end)
         after_ticks(300, function()

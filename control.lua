@@ -198,26 +198,45 @@ local function isFruit(item_name)
   return is_fruit[item_name] == true
 end
 
+---Fluid held in an entity's tanks, which the game throws away whether the entity is
+---destroyed or taken apart, so it is spilled either way.
 ---@param e LuaEntity
 local function fluidSpill(e)
+  if not pollutant_of(e.surface) then return end
   -- 2.1 removed LuaEntity.fluidbox. fluids_count answers for every entity, so a chest or
   -- a biter simply reports nothing and the loop does not run -- where reading .fluidbox
   -- off one was an error that took the mod down with it. It also counts fluid held
-  -- outside a fluidbox proper, so a destroyed fluid wagon or fluid turret now spills what
-  -- it was carrying, which it never used to.
-  if not pollutant_of(e.surface) then return end
+  -- outside a fluidbox proper, so a destroyed fluid wagon or fluid turret spills what it
+  -- was carrying, which it never used to.
   for b = 1, e.fluids_count do
     local fluid = e.get_fluid(b)
     if fluid then
       createSpill(e.surface, e.position, e.force, fluid.name, fluid.amount)
     end
   end
+end
 
-  -- A plant taken any way other than by harvesting gives up its fruit on the ground. An
-  -- agricultural tower harvesting one raises its own events, which this mod does not
-  -- answer, so a picked crop is not also a spilled one.
+---Whether a plant has anything on it yet. An unripe one mines to nothing, so there is
+---nothing to spill off it either.
+---@param e LuaEntity
+---@return boolean
+local function isRipe(e)
+  local grown = e.tick_grown
+  return grown == nil or grown <= game.tick
+end
+
+---What an entity was carrying, which is lost only when it is destroyed. Somebody who
+---takes a chest apart keeps what was in it, and somebody who fells a ripe plant keeps its
+---fruit, so none of this is spilled when a thing is mined.
+---@param e LuaEntity
+local function contentsSpill(e)
+  if not pollutant_of(e.surface) then return end
+
+  -- A plant taken any way other than by harvesting drops its fruit on the ground. An
+  -- agricultural tower raises its own events, which this mod does not answer, so a picked
+  -- crop is never also a spilled one.
   local harvest = fruitOf(e.prototype)
-  if harvest then
+  if harvest and isRipe(e) then
     createSpill(e.surface, e.position, e.force, harvest.item, harvest.amount)
   end
 
@@ -299,6 +318,7 @@ end
 
 local function onEntityDied(event)
   fluidSpill(event.entity)
+  contentsSpill(event.entity)
   remnantPollution(event.entity)
 end
 
@@ -324,6 +344,7 @@ if script.active_mods["factorio-test"] and script.active_mods["wp-tests"] then
     "test.ft.surfaces",
     "test.ft.planets",
     "test.ft.barrels",
+    "test.ft.matrix",
     "test.ft.rocket",
   }, {
     load_luassert = true,
