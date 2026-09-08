@@ -6,17 +6,9 @@
 --   end
 -- end
 
--- Fluid types that will not make a spill
-local IGNORED_FLUIDS = {
-  ["steam"] = true,
-}
+local spill = require("lib.spill")
 
--- Fluids types that create a puddle, but don't pollute
-local NON_POLLUTANTS = {
-  ["water"] = true,
-}
-
-local spill_sizes = {"small","medium","large"}
+local spill_sizes = spill.SIZES
 
 ---@class PollutionSource
 ---@field entity LuaEntity
@@ -63,14 +55,12 @@ local function onTick(event)
       local evap_amount = source.amount * settings.global['pollution_evaporation'].value
       local pollute_amount = evap_amount * settings.global['pollution_intensity'].value / 50.0
 
-      local spill_type = 'chemical-spill'
+      local spill_type = spill.kind(source.fluid)
       -- Decide whether we want to create pollution
-      if NON_POLLUTANTS[source.fluid] ~= true then
+      if spill_type == 'chemical-spill' then
         -- debug("pollute! " .. source.entity.position.x .. "," .. source.entity.position.y .. " " .. source.fluid .. " " .. source.amount .. " " .. pollute_amount)
         -- Create pollution in proportion to the spill size
         source.entity.surface.pollute(source.entity.position, pollute_amount)
-      else
-        spill_type = 'liquid-spill'
       end
 
       source.amount = source.amount - evap_amount
@@ -83,7 +73,7 @@ local function onTick(event)
           -- debug("shrinking "..source.entity.name)
           local old_entity = source.entity
           local new_entity = old_entity.surface.create_entity{
-            name = spill_type..'-'..source.fluid..'-'..smaller_size,
+            name = spill.entity_name(source.fluid, smaller_size),
             position = old_entity.position,
             force = old_entity.force,
           }
@@ -121,15 +111,6 @@ local function onTick(event)
   end
 end
 
-local function bounding_box_area(box)
-  if not box or not box.right_bottom or not box.right_bottom.x then
-    return 0
-  else
-    return (box.right_bottom.x - box.left_top.x) *
-           (box.right_bottom.y - box.left_top.y)
-  end
-end
-
 ---@param e LuaEntity
 local function fluidSpill(e)
   -- 2.1 removed LuaEntity.fluidbox. fluids_count answers for every entity, so a chest or
@@ -139,29 +120,14 @@ local function fluidSpill(e)
   -- it was carrying, which it never used to.
   for b = 1, e.fluids_count do
     local fluid = e.get_fluid(b)
-    if fluid and IGNORED_FLUIDS[fluid.name] ~= true then
+    if fluid and not spill.ignored(fluid.name) then
       local spill_amount = fluid.amount
-      ---@type string
-      local spill_size
-      if spill_amount < settings.startup['medium_spill_threshold'].value then
-        spill_size = 'small'
-      elseif spill_amount < settings.startup['large_spill_threshold'].value then
-        spill_size = 'medium'
-      else
-        spill_size = 'large'
-      end
-
-      ---Figure out if its a pollutant
-      ---@type string
-      local spill_type
-      if NON_POLLUTANTS[fluid.name] ~= true then
-        spill_type = 'chemical-spill'
-      else
-        spill_type = 'liquid-spill'
-      end
+      local spill_size = spill.size(spill_amount,
+        settings.startup['medium_spill_threshold'].value,
+        settings.startup['large_spill_threshold'].value)
 
       local spill_entity = e.surface.create_entity{
-        name = spill_type .. '-' .. fluid.name .. '-' .. spill_size,
+        name = spill.entity_name(fluid.name, spill_size),
         position = e.position,
         force = e.force,
       }
@@ -188,7 +154,7 @@ local function corpsesPollution(entity_name, surface, position)
     if prototype.type ~= "unit" then
       for cn, cep in pairs(prototype.corpses) do
         -- small remnants have size 1, medium 4, large 9
-        local corpse_size = bounding_box_area(cep.selection_box)
+        local corpse_size = spill.bounding_box_area(cep.selection_box)
         -- debug("pollute! " .. cn .. " " .. position.x .. "," .. position.y .. " " .. corpse_size * settings.global['pollution_intensity'].value * 100)
         surface.pollute(position, corpse_size * settings.global['pollution_intensity'].value * 20)
         break
@@ -232,3 +198,17 @@ script.on_event(defines.events.on_tick, onTick)
 
 script.on_init(setUpStorage)
 script.on_configuration_changed(setUpStorage)
+
+--- wp-tests is never published, so this can never fire on a player's machine -- which
+--- matters, because info.json keeps test/ out of the package.
+if script.active_mods["factorio-test"] and script.active_mods["wp-tests"] then
+  require("__factorio-test__/init")({
+    "test.ft.spilling",
+    "test.ft.evaporation",
+    "test.ft.surfaces",
+    "test.ft.rocket",
+  }, {
+    load_luassert = true,
+    game_speed = 100,
+  })
+end

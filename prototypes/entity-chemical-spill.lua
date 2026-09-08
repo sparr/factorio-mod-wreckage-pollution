@@ -9,28 +9,19 @@ local spill_sizes = {
   large = { name = "large",  size = 3, max_amount = 25000 }, -- TODO get max fluid container size
 }
 
--- liquids that create non-polluting spills
-local non_pollutants = {
-  ["water"] = true,
-}
+local spill = require("lib.spill")
 
 for name, proto in pairs(data.raw.fluid) do
   for size_name, spill_data in pairs(spill_sizes) do
     local size = spill_data.size
     -- See what kind of entity this liquid gets
-    ---@type string
-    local spill_type
-    if non_pollutants[name] == true then
-      spill_type = 'liquid-spill'
-    else
-      spill_type = 'chemical-spill'
-    end
+    local spill_type = spill.kind(name)
 
     data:extend(
       {
         {
           type = "simple-entity",
-          name = spill_type .. "-" .. proto.name .. '-' .. size_name,
+          name = spill.entity_name(proto.name, size_name),
           flags = {"placeable-neutral", "placeable-off-grid", "not-on-map"},
           icon = "__wreckage-pollution__/graphics/entity/chemical-spill-" .. size_name .. ".png",
           icon_size = size * 64,
