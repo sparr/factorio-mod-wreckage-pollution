@@ -1,6 +1,3 @@
-global.pollution_sources = global.pollution_sources or {}
-global.pollution_index = global.pollution_index or #global.pollution_sources
-
 -- local dx = 1
 -- local function debug(...)
 --   if game and game.players[1] then
@@ -28,28 +25,36 @@ local spill_sizes = {"small","medium","large"}
 ---@field fluid string
 ---@field tick integer
 
----@class (exact) Global
+---@class (exact) Storage
 ---@field pollution_sources PollutionSource[]
 ---@field pollution_index integer Which pollution source should be polled next?
----@type Global
-global=global
+---@type Storage
+storage=storage
+
+--- 2.0 renamed global to storage, and a mod may no longer set it up as its control file
+--- is read: that has to wait for on_init, or for on_configuration_changed when the mod is
+--- added to a game that already exists.
+local function setUpStorage()
+  storage.pollution_sources = storage.pollution_sources or {}
+  storage.pollution_index = storage.pollution_index or #storage.pollution_sources
+end
 
 local function onTick(event)
-  if #global.pollution_sources == 0 then return end
+  if #storage.pollution_sources == 0 then return end
 
   -- bail early if it's too soon to process the next source
-  if global.pollution_sources[global.pollution_index] and global.pollution_sources[global.pollution_index].tick > event.tick - 60 then
+  if storage.pollution_sources[storage.pollution_index] and storage.pollution_sources[storage.pollution_index].tick > event.tick - 60 then
     return
   end
   -- process n sources per tick, each souce once per second, to spread out the load
-  local n_sources = math.ceil(#global.pollution_sources / 60)
+  local n_sources = math.ceil(#storage.pollution_sources / 60)
 
   for _ = 1, n_sources do
-    local source = global.pollution_sources[global.pollution_index]
+    local source = storage.pollution_sources[storage.pollution_index]
     local removed = false
     if not source or not source.entity or not source.entity.valid then
-      if global.pollution_index > 0 and global.pollution_index <= #global.pollution_sources then
-        table.remove(global.pollution_sources, global.pollution_index)
+      if storage.pollution_index > 0 and storage.pollution_index <= #storage.pollution_sources then
+        table.remove(storage.pollution_sources, storage.pollution_index)
         removed = true
       end
     else
@@ -83,13 +88,14 @@ local function onTick(event)
             force = old_entity.force,
           }
           if new_entity then
+            -- minable is a computed property in 2.1 and no longer assignable. The spill
+            -- prototype declares no minable properties, so it was never minable anyway.
             new_entity.destructible = false
-            new_entity.minable = false
             new_entity.health = source.amount
             source.entity = new_entity
             source.size = smaller_size
           else
-            table.remove(global.pollution_sources, global.pollution_index)
+            table.remove(storage.pollution_sources, storage.pollution_index)
             removed = true
           end
           old_entity.destroy()
@@ -100,17 +106,17 @@ local function onTick(event)
       if source.amount < 0.1 / settings.global['pollution_evaporation'].value then
         -- debug("destroying "..source.entity.name)
         source.entity.destroy()
-        table.remove(global.pollution_sources, global.pollution_index)
+        table.remove(storage.pollution_sources, storage.pollution_index)
         removed = true
       end
     end
 
-    if #global.pollution_sources > 0 then
+    if #storage.pollution_sources > 0 then
       if not removed then
-        global.pollution_index = (global.pollution_index - 2) % #global.pollution_sources + 1
+        storage.pollution_index = (storage.pollution_index - 2) % #storage.pollution_sources + 1
       end
     else
-      global.pollution_index = 0
+      storage.pollution_index = 0
     end
   end
 end
@@ -126,44 +132,49 @@ end
 
 ---@param e LuaEntity
 local function fluidSpill(e)
-  -- create a chemical spill for non-water fluids being destroyed
-  if #e.fluidbox > 0 then
-    for b = 1, #e.fluidbox do
-      if e.fluidbox[b] and IGNORED_FLUIDS[e.fluidbox[b].name] ~= true then
-        local spill_amount = e.fluidbox[b].amount
-        ---@type string
-        local spill_size
-        if spill_amount < settings.startup['medium_spill_threshold'].value then
-          spill_size = 'small'
-        elseif spill_amount < settings.startup['large_spill_threshold'].value then
-          spill_size = 'medium'
-        else
-          spill_size = 'large'
-        end
+  -- 2.1 removed LuaEntity.fluidbox. fluids_count answers for every entity, so a chest or
+  -- a biter simply reports nothing and the loop does not run -- where reading .fluidbox
+  -- off one was an error that took the mod down with it. It also counts fluid held
+  -- outside a fluidbox proper, so a destroyed fluid wagon or fluid turret now spills what
+  -- it was carrying, which it never used to.
+  for b = 1, e.fluids_count do
+    local fluid = e.get_fluid(b)
+    if fluid and IGNORED_FLUIDS[fluid.name] ~= true then
+      local spill_amount = fluid.amount
+      ---@type string
+      local spill_size
+      if spill_amount < settings.startup['medium_spill_threshold'].value then
+        spill_size = 'small'
+      elseif spill_amount < settings.startup['large_spill_threshold'].value then
+        spill_size = 'medium'
+      else
+        spill_size = 'large'
+      end
 
-        ---Figure out if its a pollutant
-        ---@type string
-        local spill_type
-        if NON_POLLUTANTS[e.fluidbox[b].name] ~= true then
-          spill_type = 'chemical-spill'
-        else
-          spill_type = 'liquid-spill'
-        end
+      ---Figure out if its a pollutant
+      ---@type string
+      local spill_type
+      if NON_POLLUTANTS[fluid.name] ~= true then
+        spill_type = 'chemical-spill'
+      else
+        spill_type = 'liquid-spill'
+      end
 
-        spill_entity = e.surface.create_entity{name = spill_type .. '-' .. e.fluidbox[b].name .. '-' .. spill_size, position = e.position, force = e.force}
-        if spill_entity then
-          spill_entity.destructible = false
-          spill_entity.minable = false
-          spill_entity.health = spill_amount
-          -- debug(" create pollution source " .. spill_entity.position.x .. "," .. spill_entity.position.y .. " " .. spill_amount)
-          global.pollution_sources[#global.pollution_sources + 1] = {
-            entity = spill_entity,
-            amount = spill_amount,
-            size = spill_size,
-            fluid = e.fluidbox[b].name,
-            tick = game.tick
-          }
-        end
+      local spill_entity = e.surface.create_entity{
+        name = spill_type .. '-' .. fluid.name .. '-' .. spill_size,
+        position = e.position,
+        force = e.force,
+      }
+      if spill_entity then
+        spill_entity.destructible = false
+        spill_entity.health = spill_amount
+        storage.pollution_sources[#storage.pollution_sources + 1] = {
+          entity = spill_entity,
+          amount = spill_amount,
+          size = spill_size,
+          fluid = fluid.name,
+          tick = game.tick
+        }
       end
     end
   end
@@ -171,10 +182,11 @@ end
 
 -- create one-time pollution based on the corpse/remnant definition of an entity
 local function corpsesPollution(entity_name, surface, position)
-  if game.entity_prototypes and game.entity_prototypes[entity_name] and game.entity_prototypes[entity_name].corpses then
+  local prototype = prototypes.entity[entity_name]
+  if prototype and prototype.corpses then
     -- pollute for everything except biter corpses
-    if game.entity_prototypes[entity_name].type ~= "unit" then
-      for cn, cep in pairs(game.entity_prototypes[entity_name].corpses) do
+    if prototype.type ~= "unit" then
+      for cn, cep in pairs(prototype.corpses) do
         -- small remnants have size 1, medium 4, large 9
         local corpse_size = bounding_box_area(cep.selection_box)
         -- debug("pollute! " .. cn .. " " .. position.x .. "," .. position.y .. " " .. corpse_size * settings.global['pollution_intensity'].value * 100)
@@ -193,9 +205,11 @@ local function remnantPollution(e)
   for inv_num--[[@type defines.inventory]] = 1, e.get_max_inventory_index() do
     local inventory = e.get_inventory(inv_num)
     if inventory then
-      for item_name, item_count in pairs(inventory.get_contents()) do
+      -- 2.0 changed get_contents from a name-to-count mapping into a list of
+      -- {name, count, quality} records
+      for _, item in pairs(inventory.get_contents()) do
         -- TODO handle items that don't have same name entities
-        corpsesPollution(item_name, e.surface, e.position)
+        corpsesPollution(item.name, e.surface, e.position)
       end
     end
   end
@@ -215,3 +229,6 @@ script.on_event(defines.events.on_pre_player_mined_item, onEntityMined)
 script.on_event(defines.events.on_robot_pre_mined, onEntityMined)
 
 script.on_event(defines.events.on_tick, onTick)
+
+script.on_init(setUpStorage)
+script.on_configuration_changed(setUpStorage)
