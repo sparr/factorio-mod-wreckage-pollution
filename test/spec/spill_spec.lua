@@ -78,3 +78,70 @@ describe("how big a wreck counts as", function()
         assert.are.equal(0, spill.bounding_box_area{right_bottom = {}})
     end)
 end)
+
+describe("which items are containers of fluid", function()
+    --- Shaped the way the game's own emptying recipes are: the container goes in, the
+    --- fluid and the empty container come out.
+    local function unbarrel(item, fluid, amount)
+        return {
+            ingredients = { { type = "item", name = item, amount = 1 } },
+            products = { { type = "fluid", name = fluid, amount = amount },
+                         { type = "item", name = "barrel", amount = 1 } },
+        }
+    end
+
+    it("reads the fluid and the amount off the emptying recipe", function()
+        local held = spill.containers{
+            ["empty-crude-oil-barrel"] = unbarrel("crude-oil-barrel", "crude-oil", 50),
+            ["empty-water-barrel"] = unbarrel("water-barrel", "water", 50),
+        }
+        assert.are.same({ fluid = "crude-oil", amount = 50 }, held["crude-oil-barrel"])
+        assert.are.same({ fluid = "water", amount = 50 }, held["water-barrel"])
+    end)
+
+    -- melting one ice into twenty water is the same shape without a container coming
+    -- back, and ice is not a container -- it is the thing itself
+    it("does not count a conversion that hands back no container", function()
+        local held = spill.containers{
+            ["ice-melting"] = {
+                ingredients = { { type = "item", name = "ice", amount = 1 } },
+                products = { { type = "fluid", name = "water", amount = 20 } },
+            },
+        }
+        assert.is_nil(held["ice"])
+    end)
+
+    it("ignores recipes that consume a fluid, which are fillings not emptyings", function()
+        local held = spill.containers{
+            ["fill-crude-oil-barrel"] = {
+                ingredients = { { type = "fluid", name = "crude-oil", amount = 50 },
+                                { type = "item", name = "barrel", amount = 1 } },
+                products = { { type = "item", name = "crude-oil-barrel", amount = 1 } },
+            },
+        }
+        assert.are.same({}, held)
+    end)
+
+    it("ignores a recipe that consumes several of the item", function()
+        local held = spill.containers{
+            ["press"] = {
+                ingredients = { { type = "item", name = "wood", amount = 10 } },
+                products = { { type = "fluid", name = "resin", amount = 5 },
+                             { type = "item", name = "ash", amount = 1 } },
+            },
+        }
+        assert.is_nil(held["wood"])
+    end)
+
+    it("ignores a recipe that produces more than one fluid", function()
+        local held = spill.containers{
+            ["crack"] = {
+                ingredients = { { type = "item", name = "cell", amount = 1 } },
+                products = { { type = "fluid", name = "water", amount = 5 },
+                             { type = "fluid", name = "steam", amount = 5 },
+                             { type = "item", name = "shell", amount = 1 } },
+            },
+        }
+        assert.is_nil(held["cell"])
+    end)
+end)

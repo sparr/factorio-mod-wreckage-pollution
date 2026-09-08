@@ -111,6 +111,34 @@ local function onTick(event)
   end
 end
 
+--- Put a spill on the ground and start watching it.
+---@param surface LuaSurface
+---@param position MapPosition
+---@param force LuaForce|string
+---@param fluid_name string
+---@param amount number
+local function createSpill(surface, position, force, fluid_name, amount)
+  if spill.ignored(fluid_name) or amount <= 0 then return end
+  local size = spill.size(amount,
+    settings.startup['medium_spill_threshold'].value,
+    settings.startup['large_spill_threshold'].value)
+  local entity = surface.create_entity{
+    name = spill.entity_name(fluid_name, size), position = position, force = force }
+  if not entity then return end
+  entity.destructible = false
+  entity.health = amount
+  storage.pollution_sources[#storage.pollution_sources + 1] = {
+    entity = entity, amount = amount, size = size, fluid = fluid_name, tick = game.tick }
+end
+
+--- Which items are containers, and what each holds. Worked out once, from recipes, which
+--- cannot change while a game is running.
+local containers = nil
+local function heldFluids()
+  containers = containers or spill.containers(prototypes.recipe)
+  return containers
+end
+
 ---@param e LuaEntity
 local function fluidSpill(e)
   -- 2.1 removed LuaEntity.fluidbox. fluids_count answers for every entity, so a chest or
@@ -120,29 +148,28 @@ local function fluidSpill(e)
   -- it was carrying, which it never used to.
   for b = 1, e.fluids_count do
     local fluid = e.get_fluid(b)
-    if fluid and not spill.ignored(fluid.name) then
-      local spill_amount = fluid.amount
-      local spill_size = spill.size(spill_amount,
-        settings.startup['medium_spill_threshold'].value,
-        settings.startup['large_spill_threshold'].value)
+    if fluid then
+      createSpill(e.surface, e.position, e.force, fluid.name, fluid.amount)
+    end
+  end
 
-      local spill_entity = e.surface.create_entity{
-        name = spill.entity_name(fluid.name, spill_size),
-        position = e.position,
-        force = e.force,
-      }
-      if spill_entity then
-        spill_entity.destructible = false
-        spill_entity.health = spill_amount
-        storage.pollution_sources[#storage.pollution_sources + 1] = {
-          entity = spill_entity,
-          amount = spill_amount,
-          size = spill_size,
-          fluid = fluid.name,
-          tick = game.tick
-        }
+  -- and whatever was sitting in barrels inside it, gathered per fluid so a chest of
+  -- fifty barrels leaves one spill rather than fifty
+  local from_containers = {}
+  for inv_num--[[@type defines.inventory]] = 1, e.get_max_inventory_index() do
+    local inventory = e.get_inventory(inv_num)
+    if inventory then
+      for _, item in pairs(inventory.get_contents()) do
+        local held = heldFluids()[item.name]
+        if held then
+          from_containers[held.fluid] =
+            (from_containers[held.fluid] or 0) + held.amount * item.count
+        end
       end
     end
+  end
+  for fluid_name, amount in pairs(from_containers) do
+    createSpill(e.surface, e.position, e.force, fluid_name, amount)
   end
 end
 
@@ -206,6 +233,7 @@ if script.active_mods["factorio-test"] and script.active_mods["wp-tests"] then
     "test.ft.spilling",
     "test.ft.evaporation",
     "test.ft.surfaces",
+    "test.ft.barrels",
     "test.ft.rocket",
   }, {
     load_luassert = true,

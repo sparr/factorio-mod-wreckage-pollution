@@ -60,6 +60,49 @@ function spill.entity_name(fluid_name, size)
   return spill.kind(fluid_name) .. "-" .. fluid_name .. "-" .. size
 end
 
+---@class HeldFluid
+---@field fluid string
+---@field amount number per one of the item
+
+---Which items are containers holding a fluid, worked out from the recipes that empty
+---them. A barrel is only a barrel because a recipe turns one of them back into fifty
+---units of something, and that is as true of a modded canister as of a vanilla barrel.
+---
+---The shape looked for is: one item goes in, no fluid goes in, one fluid comes out, and
+---an item comes out too. That last part is what separates a container from a conversion.
+---Melting one ice into twenty water is the same shape without it, and ice is not a
+---container -- it is the thing itself.
+---@param recipe_prototypes table<string, {ingredients: table[], products: table[]}>
+---@return table<string, HeldFluid>
+function spill.containers(recipe_prototypes)
+  local held = {}
+  for _, recipe in pairs(recipe_prototypes) do
+    local item_in, fluid_out, item_out, ok = nil, nil, false, true
+    for _, ingredient in pairs(recipe.ingredients or {}) do
+      if ingredient.type == "fluid" then
+        ok = false
+      elseif item_in then
+        ok = false
+      else
+        item_in = ingredient
+      end
+    end
+    if ok and item_in and item_in.amount == 1 then
+      for _, product in pairs(recipe.products or {}) do
+        if product.type == "fluid" then
+          if fluid_out then ok = false else fluid_out = product end
+        else
+          item_out = true
+        end
+      end
+      if ok and item_out and fluid_out and (fluid_out.amount or 0) > 0 then
+        held[item_in.name] = { fluid = fluid_out.name, amount = fluid_out.amount }
+      end
+    end
+  end
+  return held
+end
+
 ---@class SpillBox
 ---@field left_top {x: number, y: number}
 ---@field right_bottom {x: number, y: number}
