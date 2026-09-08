@@ -45,6 +45,29 @@ describe("destroying barrels", function()
         }, world.spills(arena))
     end)
 
+    -- laid on the same tile they would cover each other exactly, and only one of the two
+    -- could be seen
+    it("does not lay two spills on top of one another", function()
+        local arena = world.arena(game.surfaces.nauvis)
+        local chest = arena.surface.create_entity{
+            name = "steel-chest", position = arena.centre, force = "player" }
+        chest.insert{ name = "crude-oil-barrel", count = 5 }
+        chest.insert{ name = "water-barrel", count = 5 }
+        chest.die()
+        local seen = {}
+        local r = arena.radius + 4
+        for _, entity in pairs(arena.surface.find_entities_filtered{
+            type = "simple-entity",
+            area = { { arena.centre.x - r, arena.centre.y - r },
+                     { arena.centre.x + r, arena.centre.y + r } } }) do
+            if entity.name:find("spill") then
+                local at = ("%.2f,%.2f"):format(entity.position.x, entity.position.y)
+                assert.is_nil(seen[at], "two spills are sitting on " .. at)
+                seen[at] = entity.name
+            end
+        end
+    end)
+
     it("leaves nothing for an empty barrel", function()
         local arena = world.arena(game.surfaces.nauvis)
         wreck_a_chest_of(arena, "barrel", 50)

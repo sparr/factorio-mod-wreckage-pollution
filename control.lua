@@ -142,8 +142,15 @@ local function createSpill(surface, position, force, fluid_name, amount)
   local size = spill.size(amount,
     settings.startup['medium_spill_threshold'].value,
     settings.startup['large_spill_threshold'].value)
+  local name = spill.entity_name(fluid_name, size)
+  -- One wreck can make several spills at once: a chest of oil barrels and water barrels,
+  -- or a tank with more than one fluidbox. Laid on the same tile they cover each other
+  -- exactly and only the top one can be seen, so each is nudged to somewhere clear.
+  -- Spills collide with one another on the floor layer, which is what makes that work.
+  -- If there is nowhere clear, overlapping is still better than losing the spill.
+  local clear = surface.find_non_colliding_position(name, position, 8, 0.5)
   local entity = surface.create_entity{
-    name = spill.entity_name(fluid_name, size), position = position, force = force }
+    name = name, position = clear or position, force = force }
   if not entity then return end
   entity.destructible = false
   entity.health = amount
