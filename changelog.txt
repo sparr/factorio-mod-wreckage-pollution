@@ -1,6 +1,26 @@
 ---------------------------------------------------------------------------------------------------
 Version: 2.1.2
-Date: ????
+Date: 2026-09-08
+  Features:
+    - Destroying something that was holding fluid in barrels spills what was in them. A
+      chest of oil barrels leaves one oil spill rather than nothing at all
+    - Destroying a ripe yumako tree or jellystem lets go of the spores that picking it
+      would have, and leaves its fruit on the ground to rot and give off as much again.
+      Destroying anything holding fruit spills that too. Harvesting, by hand or by
+      agricultural tower, is untouched: the fruit goes to whoever picked it
+  Bugfixes:
+    - Several spills from one wreck are thrown about a little instead of landing on the
+      same tile with one hiding the others
+  Changes:
+    - Nothing happens on a planet that has no pollution of its own. Vulcanus, Fulgora,
+      Aquilo and space platforms record nothing, so spills there sat on the ground doing
+      nothing; none are made now, and any left over from an earlier version are cleared
+      away
+    - Wreckage puts nothing into the air by itself anywhere except Nauvis. On Gleba the
+      spores come from the plants
+    - Felling a tree no longer pollutes. Biters knocking trees down was putting pollution
+      in places nobody had been, and a forest takes pollution out of the air rather than
+      putting it in
 ---------------------------------------------------------------------------------------------------
 Version: 2.1.1
 Date: 2026-09-08
