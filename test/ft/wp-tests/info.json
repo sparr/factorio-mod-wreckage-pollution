@@ -6,9 +6,10 @@
   "contact": "sparr0@gmail.com",
   "homepage": "https://github.com/sparr/factorio-mod-wreckage-pollution/tree/master/test/ft/wp-tests",
   "factorio_version": "2.1",
-  "description": "Carries no prototypes. Its presence is what tells Wreckage Pollution to register its test suite, so the fixtures can never run on a player's machine. Published with the mod's source on GitHub, but never to the mod portal.",
+  "description": "Carries no prototypes of its own. Its presence is what tells Wreckage Pollution to register its test suite, so the fixtures can never run on a player machine, and it flattens the rocket launch timings so the space platform fixture does not sit through a cinematic. Published with the mod source on GitHub, but never to the mod portal.",
   "dependencies": [
     "base",
+    "space-age",
     "wreckage-pollution"
   ]
 }

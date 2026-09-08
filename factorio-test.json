@@ -9,9 +9,7 @@
   ],
   "test": {
     "game_speed": 100,
-    "default_timeout": 36000,
-    "tag_blacklist": [
-      "rocket"
-    ]
+    "default_timeout": 7200,
+    "tag_blacklist": []
   }
 }

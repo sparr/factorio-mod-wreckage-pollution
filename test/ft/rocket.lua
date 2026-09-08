@@ -5,8 +5,11 @@
 --- rocket and waits for the game to fly it up, so the surface under test is one the game
 --- assembled through its own machinery rather than one handed over by a script.
 ---
---- It is tagged and blacklisted because it costs a few thousand ticks. Run it with:
----   test/ft/run.sh --tag-whitelist rocket --tag-blacklist nothing
+--- A launch takes about forty-four seconds of game time at the prototypes' own pace,
+--- nearly all of it cinematics. wp-tests flattens those, which brings the platform in at
+--- tick 120 and lets this run alongside everything else rather than sitting behind a
+--- blacklisted tag. It keeps the tag so it can still be run on its own:
+---   test/ft/run.sh --tag-whitelist rocket
 local world = require("test.ft.world")
 
 local SILO_AT = { x = -256, y = -256 }
@@ -63,43 +66,35 @@ describe("a platform put up by an actual rocket", function()
         -- skip building the rocket part by part; this fixture is about the flight
         silo.rocket_parts = silo.prototype.rocket_parts_required
 
-        local loaded = false
-        for second = 1, 30 do
-            after_ticks(second * 60, function()
-                if loaded then return end
-                local rocket = silo.get_inventory(defines.inventory.rocket_silo_rocket)
-                if rocket and rocket.insert{
-                    name = "space-platform-starter-pack", count = 1 } == 1 then
-                    loaded = true
+        -- One poll doing both jobs: put the pack in as soon as the silo has a rocket
+        -- to put it in, then watch for the platform. Ten times a second, so the timings
+        -- reported are the real ones rather than an artefact of how often it looked.
+        local loaded_at, arrived_at
+        for tick = 6, 10 * 60, 6 do
+            after_ticks(tick, function()
+                if not loaded_at then
+                    local rocket = silo.get_inventory(defines.inventory.rocket_silo_rocket)
+                    if rocket and rocket.insert{
+                        name = "space-platform-starter-pack", count = 1 } == 1 then
+                        loaded_at = tick
+                    end
+                elseif not arrived_at and platform.valid and platform.surface then
+                    arrived_at = tick
                 end
             end)
         end
 
-        after_ticks(31 * 60, function()
-            assert.is_true(loaded, "never got a starter pack into the rocket")
-        end)
-
-        -- The silo launches on its own once it is holding cargo bound for a platform.
-        -- The flight took about forty-four seconds when this was written; the window is
-        -- far wider than that so a slower machine or a changed flight time does not turn
-        -- into a mystery failure.
-        local arrived_at
-        for second = 32, 240, 4 do
-            after_ticks(second * 60, function()
-                if not arrived_at and platform.valid and platform.surface then
-                    arrived_at = second
-                end
-            end)
-        end
-
-        after_ticks(241 * 60, function()
+        after_ticks(10 * 60 + 6, function()
+            assert.is_not_nil(loaded_at, "never got a starter pack into the rocket")
             assert.is_true(platform.valid, "the platform stopped existing")
             local built = platform.surface
             assert.is_not_nil(built,
-                "no platform surface after the launch; silo status was " ..
-                (silo.valid and tostring(silo.status) or "gone"))
-            print(("the platform arrived about %s seconds after the silo was built")
-                :format(tostring(arrived_at)))
+                "no platform surface within ten seconds of the launch; silo status was " ..
+                (silo.valid and tostring(silo.status) or "gone") ..
+                ". If wp-tests has stopped flattening the launch timings, a real launch " ..
+                "takes about forty-four seconds and this window is far too short.")
+            print(("pack loaded at tick %d, platform arrived at tick %s")
+                :format(loaded_at, tostring(arrived_at)))
             assert.is_nil(built.pollutant_type, "a platform should have no pollutant")
 
             -- and now the thing this whole fixture exists for: break something up there
