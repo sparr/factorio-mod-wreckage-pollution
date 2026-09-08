@@ -131,33 +131,61 @@ local function onTick(event)
   end
 end
 
+--- How far from the wreck a spill may be thrown when a wreck makes more than one, by the
+--- size of that spill. A bigger puddle spreads further from where the thing stood.
+local SCATTER = { small = 0.5, medium = 1, large = 1.5 }
+
+--- and a little further again for each spill past the first, so that a wreck letting go
+--- of several does not pile them all in the same armful
+local SCATTER_PER_EXTRA = 0.25
+
 --- Put a spill on the ground and start watching it.
 ---@param surface LuaSurface
 ---@param position MapPosition
 ---@param force LuaForce|string
----@param fluid_name string
+---@param what string a fluid, or a fruit
 ---@param amount number
-local function createSpill(surface, position, force, fluid_name, amount)
-  if spill.ignored(fluid_name) or amount <= 0 then return end
+---@param scatter number how far it may be thrown from the position given
+local function createSpill(surface, position, force, what, amount, scatter)
+  if spill.ignored(what) or amount <= 0 then return end
   local size = spill.size(amount,
     settings.startup['medium_spill_threshold'].value,
     settings.startup['large_spill_threshold'].value)
-  local name = spill.entity_name(fluid_name, size)
-  -- One wreck can make several spills at once: a chest of oil barrels and water barrels,
-  -- or a tank with more than one fluidbox. Laid on the same tile they cover each other
-  -- exactly and only the top one can be seen, so each is nudged off the others. Spills
-  -- collide with one another on the floor layer, and their collision box is a good deal
-  -- smaller than their sprite, so the nudge is small enough that they still lie over one
-  -- another. If there is nowhere clear, overlapping entirely still beats losing the
-  -- spill.
-  local clear = surface.find_non_colliding_position(name, position, 4, 0.25)
+  local at = position
+  if scatter and scatter > 0 then
+    local room = (SCATTER[size] or 1) + scatter
+    local angle = math.random() * 2 * math.pi
+    local distance = math.random() * room
+    at = { x = position.x + math.cos(angle) * distance,
+           y = position.y + math.sin(angle) * distance }
+  end
   local entity = surface.create_entity{
-    name = name, position = clear or position, force = force }
+    name = spill.entity_name(what, size), position = at, force = force,
+    -- Belt and braces. A spill is placeable-off-grid and lands exactly where it is put
+    -- with or without this; saying so out loud costs nothing and keeps the scatter safe
+    -- if that ever stops being true.
+    snap_to_grid = false }
   if not entity then return end
   entity.destructible = false
   entity.health = amount
   storage.pollution_sources[#storage.pollution_sources + 1] = {
-    entity = entity, amount = amount, size = size, fluid = fluid_name, tick = game.tick }
+    entity = entity, amount = amount, size = size, fluid = what, tick = game.tick }
+end
+
+--- Lay out everything one wreck spilled.
+---
+--- A single spill goes exactly where the wreck was. Several are thrown about a little, so
+--- that a chest of oil and water barrels leaves two puddles lying over one another rather
+--- than one neatly on the spot and the rest arranged around it.
+---@param surface LuaSurface
+---@param position MapPosition
+---@param force LuaForce|string
+---@param spills {what: string, amount: number}[]
+local function placeSpills(surface, position, force, spills)
+  local scatter = (#spills > 1) and (#spills - 1) * SCATTER_PER_EXTRA or 0
+  for _, one in pairs(spills) do
+    createSpill(surface, position, force, one.what, one.amount, scatter)
+  end
 end
 
 --- Which items are containers, and what each holds. Worked out once, from recipes, which
@@ -203,8 +231,9 @@ end
 ---Fluid held in an entity's tanks, which the game throws away whether the entity is
 ---destroyed or taken apart, so it is spilled either way.
 ---@param e LuaEntity
-local function fluidSpill(e)
-  if not pollutant_of(e.surface) then return end
+---@return {what: string, amount: number}[]
+local function fluidsOf(e)
+  local found = {}
   -- 2.1 removed LuaEntity.fluidbox. fluids_count answers for every entity, so a chest or
   -- a biter simply reports nothing and the loop does not run -- where reading .fluidbox
   -- off one was an error that took the mod down with it. It also counts fluid held
@@ -212,10 +241,9 @@ local function fluidSpill(e)
   -- was carrying, which it never used to.
   for b = 1, e.fluids_count do
     local fluid = e.get_fluid(b)
-    if fluid then
-      createSpill(e.surface, e.position, e.force, fluid.name, fluid.amount)
-    end
+    if fluid then found[#found + 1] = { what = fluid.name, amount = fluid.amount } end
   end
+  return found
 end
 
 ---Whether a plant has anything on it yet. An unripe one mines to nothing, so there is
@@ -231,8 +259,9 @@ end
 ---takes a chest apart keeps what was in it, and somebody who fells a ripe plant keeps its
 ---fruit, so none of this is spilled when a thing is mined.
 ---@param e LuaEntity
-local function contentsSpill(e)
-  if not pollutant_of(e.surface) then return end
+---@return {what: string, amount: number}[]
+local function contentsOf(e)
+  local found = {}
 
   -- A plant taken any way other than by harvesting drops its fruit on the ground. An
   -- agricultural tower raises its own events, which this mod does not answer, so a picked
@@ -248,31 +277,29 @@ local function contentsSpill(e)
     local emissions = e.prototype.harvest_emissions
     local burst = emissions and emissions[pollutant_of(e.surface)]
     if burst and burst > 0 then e.surface.pollute(e.position, burst) end
-    createSpill(e.surface, e.position, e.force,
-      harvest.item, harvest.amount * spill.FRUIT_UNITS)
+    found[#found + 1] = { what = harvest.item, amount = harvest.amount * spill.FRUIT_UNITS }
   end
 
   -- and whatever was sitting inside it: barrels of fluid, and fruit. Gathered per thing
   -- so a chest of fifty barrels leaves one spill rather than fifty.
-  local from_contents = {}
+  local totals = {}
   for inv_num--[[@type defines.inventory]] = 1, e.get_max_inventory_index() do
     local inventory = e.get_inventory(inv_num)
     if inventory then
       for _, item in pairs(inventory.get_contents()) do
         local held = heldFluids()[item.name]
         if held then
-          from_contents[held.fluid] =
-            (from_contents[held.fluid] or 0) + held.amount * item.count
+          totals[held.fluid] = (totals[held.fluid] or 0) + held.amount * item.count
         elseif isFruit(item.name) then
-          from_contents[item.name] =
-            (from_contents[item.name] or 0) + item.count * spill.FRUIT_UNITS
+          totals[item.name] = (totals[item.name] or 0) + item.count * spill.FRUIT_UNITS
         end
       end
     end
   end
-  for what, amount in pairs(from_contents) do
-    createSpill(e.surface, e.position, e.force, what, amount)
+  for what, amount in pairs(totals) do
+    found[#found + 1] = { what = what, amount = amount }
   end
+  return found
 end
 
 --- How much a destroyed thing puts into the air on a surface dealing in the named
@@ -330,13 +357,19 @@ local function remnantPollution(e)
 end
 
 local function onEntityDied(event)
-  fluidSpill(event.entity)
-  contentsSpill(event.entity)
-  remnantPollution(event.entity)
+  local e = event.entity
+  if pollutant_of(e.surface) then
+    local spills = fluidsOf(e)
+    for _, one in pairs(contentsOf(e)) do spills[#spills + 1] = one end
+    placeSpills(e.surface, e.position, e.force, spills)
+  end
+  remnantPollution(e)
 end
 
 local function onEntityMined(event)
-  fluidSpill(event.entity)
+  local e = event.entity
+  if not pollutant_of(e.surface) then return end
+  placeSpills(e.surface, e.position, e.force, fluidsOf(e))
 end
 
 script.on_event(defines.events.on_entity_died, onEntityDied)

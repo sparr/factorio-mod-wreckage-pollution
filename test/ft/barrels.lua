@@ -47,13 +47,17 @@ describe("destroying barrels", function()
 
     -- laid on the same tile they would cover each other exactly, and only one of the two
     -- could be seen
-    it("does not lay two spills on top of one another", function()
+    it("throws two spills clear of one another without lining them up", function()
         local arena = world.arena(game.surfaces.nauvis)
         local chest = arena.surface.create_entity{
             name = "steel-chest", position = arena.centre, force = "player" }
         chest.insert{ name = "crude-oil-barrel", count = 5 }
         chest.insert{ name = "water-barrel", count = 5 }
+        -- where the chest really stands, which is half a tile off the arena centre: a
+        -- chest snaps to the grid even though a spill no longer does
+        local wreck = chest.position
         chest.die()
+
         local found = {}
         local r = arena.radius + 4
         for _, entity in pairs(arena.surface.find_entities_filtered{
@@ -63,16 +67,70 @@ describe("destroying barrels", function()
             if entity.name:find("spill") then found[#found + 1] = entity end
         end
         assert.are.equal(2, #found, "expected one spill of each")
+
+        local function from_wreck(entity)
+            local ex = entity.position.x - wreck.x
+            local ey = entity.position.y - wreck.y
+            return math.sqrt(ex * ex + ey * ey)
+        end
+        -- both are small spills, thrown up to half a tile plus a quarter for the second
+        local room = 0.5 + 0.25
+        for _, entity in pairs(found) do
+            assert.is_true(from_wreck(entity) <= room + 0.001,
+                ("a spill landed %.2f tiles out, past the %.2f it is allowed")
+                    :format(from_wreck(entity), room))
+        end
+
         local dx = found[1].position.x - found[2].position.x
         local dy = found[1].position.y - found[2].position.y
-        local apart = math.sqrt(dx * dx + dy * dy)
-        assert.is_true(apart > 0, "the two spills are on the same tile, one hiding the other")
-        -- but only just: a small spill's sprite is two tiles across, so anything under
-        -- that leaves them lying over one another with both still showing. Pushed the
-        -- full width of the sprite they would read as two separate accidents.
-        assert.is_true(apart < 2,
-            ("the two spills ended up %.2f tiles apart, too far to read as one mess")
-                :format(apart))
+        assert.is_true(math.sqrt(dx * dx + dy * dy) > 0,
+            "the two spills are on the same spot, one hiding the other")
+    end)
+
+    -- Guards the scatter against being rounded away. Rounding the throw to whole tiles
+    -- is what an earlier attempt at this did, back when the wreck's own position was
+    -- mistaken for the spill's and the game looked as though it were snapping them.
+    it("throws them to real positions rather than to tile centres", function()
+        local off_grid = 0
+        for _ = 1, 8 do
+            local arena = world.arena(game.surfaces.nauvis)
+            local chest = arena.surface.create_entity{
+                name = "steel-chest", position = arena.centre, force = "player" }
+            chest.insert{ name = "crude-oil-barrel", count = 5 }
+            chest.insert{ name = "water-barrel", count = 5 }
+            chest.die()
+            local r = arena.radius + 4
+            for _, entity in pairs(arena.surface.find_entities_filtered{
+                type = "simple-entity",
+                area = { { arena.centre.x - r, arena.centre.y - r },
+                         { arena.centre.x + r, arena.centre.y + r } } }) do
+                if entity.name:find("spill") then
+                    local fx = math.abs(entity.position.x % 1 - 0.5)
+                    local fy = math.abs(entity.position.y % 1 - 0.5)
+                    if fx > 0.05 or fy > 0.05 then off_grid = off_grid + 1 end
+                end
+            end
+        end
+        assert.is_true(off_grid > 0,
+            "every one of sixteen thrown spills landed on a tile centre, so the throw is "
+            .. "being rounded and the scatter is lost")
+    end)
+
+    it("puts a lone spill exactly where the wreck was", function()
+        local arena = world.arena(game.surfaces.nauvis)
+        local chest = arena.surface.create_entity{
+            name = "steel-chest", position = arena.centre, force = "player" }
+        chest.insert{ name = "crude-oil-barrel", count = 5 }
+        local wreck = chest.position
+        chest.die()
+        local found = arena.surface.find_entities_filtered{
+            type = "simple-entity",
+            area = { { arena.centre.x - 8, arena.centre.y - 8 },
+                     { arena.centre.x + 8, arena.centre.y + 8 } } }
+        assert.are.equal(1, #found)
+        -- nothing was thrown anywhere, and snap_to_grid is off, so it is exactly there
+        assert.are.equal(wreck.x, found[1].position.x)
+        assert.are.equal(wreck.y, found[1].position.y)
     end)
 
     it("leaves nothing for an empty barrel", function()
