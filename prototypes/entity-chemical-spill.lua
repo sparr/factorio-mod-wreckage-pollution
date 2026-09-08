@@ -55,7 +55,12 @@ for name, spillable_data in pairs(spillable) do
           order = "d[chemical-spill]-a[" .. proto.name .. "]-a[" .. size_name .. "]",
           selection_box = {{-size, -size}, {size, size}},
           selectable_in_game = true,
-          collision_box = {{-size, -size}, {size, size}},
+          -- Deliberately much smaller than the sprite. Spills only collide with each
+          -- other, and this box is the whole of what decides how far apart two of them
+          -- from one wreck are pushed. At the sprite's own size a pair of large spills
+          -- ended up six tiles apart, looking like two separate accidents; at a third of
+          -- it they lie over one another with both still showing.
+          collision_box = {{-size * 0.3, -size * 0.3}, {size * 0.3, size * 0.3}},
           -- 2.0 turned collision layers into prototypes and renamed floor-layer to
           -- floor. A spill is decoration: it lies on the ground and must not stop
           -- anything being built on top of it.

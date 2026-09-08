@@ -54,18 +54,25 @@ describe("destroying barrels", function()
         chest.insert{ name = "crude-oil-barrel", count = 5 }
         chest.insert{ name = "water-barrel", count = 5 }
         chest.die()
-        local seen = {}
+        local found = {}
         local r = arena.radius + 4
         for _, entity in pairs(arena.surface.find_entities_filtered{
             type = "simple-entity",
             area = { { arena.centre.x - r, arena.centre.y - r },
                      { arena.centre.x + r, arena.centre.y + r } } }) do
-            if entity.name:find("spill") then
-                local at = ("%.2f,%.2f"):format(entity.position.x, entity.position.y)
-                assert.is_nil(seen[at], "two spills are sitting on " .. at)
-                seen[at] = entity.name
-            end
+            if entity.name:find("spill") then found[#found + 1] = entity end
         end
+        assert.are.equal(2, #found, "expected one spill of each")
+        local dx = found[1].position.x - found[2].position.x
+        local dy = found[1].position.y - found[2].position.y
+        local apart = math.sqrt(dx * dx + dy * dy)
+        assert.is_true(apart > 0, "the two spills are on the same tile, one hiding the other")
+        -- but only just: a small spill's sprite is two tiles across, so anything under
+        -- that leaves them lying over one another with both still showing. Pushed the
+        -- full width of the sprite they would read as two separate accidents.
+        assert.is_true(apart < 2,
+            ("the two spills ended up %.2f tiles apart, too far to read as one mess")
+                :format(apart))
     end)
 
     it("leaves nothing for an empty barrel", function()
