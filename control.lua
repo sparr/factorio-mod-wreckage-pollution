@@ -237,7 +237,17 @@ local function contentsSpill(e)
   -- crop is never also a spilled one.
   local harvest = fruitOf(e.prototype)
   if harvest and isRipe(e) then
-    createSpill(e.surface, e.position, e.force, harvest.item, harvest.amount)
+    -- Destroying a ripe plant does what harvesting it would have done -- the game emits
+    -- nothing for a plant that is destroyed rather than picked, so this is not on top of
+    -- anything -- and then the fruit is on the ground as well. Twice a harvest in all.
+    -- The burst is exactly what the game emits for a harvest, unscaled, because that is
+    -- what it stands in for; the fruit on the ground is this mod's own and the intensity
+    -- setting scales that as it scales everything else.
+    local emissions = e.prototype.harvest_emissions
+    local burst = emissions and emissions[pollutant_of(e.surface)]
+    if burst and burst > 0 then e.surface.pollute(e.position, burst) end
+    createSpill(e.surface, e.position, e.force,
+      harvest.item, harvest.amount * spill.FRUIT_UNITS)
   end
 
   -- and whatever was sitting inside it: barrels of fluid, and fruit. Gathered per thing
@@ -252,7 +262,8 @@ local function contentsSpill(e)
           from_contents[held.fluid] =
             (from_contents[held.fluid] or 0) + held.amount * item.count
         elseif isFruit(item.name) then
-          from_contents[item.name] = (from_contents[item.name] or 0) + item.count
+          from_contents[item.name] =
+            (from_contents[item.name] or 0) + item.count * spill.FRUIT_UNITS
         end
       end
     end
@@ -345,6 +356,7 @@ if script.active_mods["factorio-test"] and script.active_mods["wp-tests"] then
     "test.ft.planets",
     "test.ft.barrels",
     "test.ft.matrix",
+    "test.ft.vanilla",
     "test.ft.rocket",
   }, {
     load_luassert = true,

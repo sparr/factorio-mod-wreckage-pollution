@@ -64,14 +64,14 @@ describe("Gleba, where the spores come from the plants", function()
         assert.are.equal("spores", surface.pollutant_type.name)
         local arena = world.arena(surface)
         ripe_plant(arena, "yumako-tree").die()
-        assert.are.same({ ["chemical-spill-yumako-small"] = 1 }, world.spills(arena),
+        assert.are.same({ ["chemical-spill-yumako-medium"] = 1 }, world.spills(arena),
             "felling a yumako tree should leave its fruit on the ground")
     end)
 
     it("does the same for a jellystem", function()
         local arena = world.arena(gleba())
         ripe_plant(arena, "jellystem").die()
-        assert.are.same({ ["chemical-spill-jellynut-small"] = 1 }, world.spills(arena))
+        assert.are.same({ ["chemical-spill-jellynut-medium"] = 1 }, world.spills(arena))
     end)
 
     it("spills the fruit out of a destroyed container", function()
@@ -81,7 +81,7 @@ describe("Gleba, where the spores come from the plants", function()
         assert.is_not_nil(chest)
         chest.insert{ name = "yumako", count = 100 }
         chest.die()
-        assert.are.same({ ["chemical-spill-yumako-small"] = 1 }, world.spills(arena))
+        assert.are.same({ ["chemical-spill-yumako-medium"] = 1 }, world.spills(arena))
     end)
 
     -- the plants make the spores there, so nothing else does
@@ -97,16 +97,39 @@ describe("Gleba, where the spores come from the plants", function()
     end)
 
     -- but the fruit rotting does, the same way any other spill gives off what it is made
-    -- of as it goes
+    -- of as it goes. Measured off a destroyed container rather than a felled plant: a
+    -- plant lets go of a burst of spores as it falls, and that cloud spreads out and is
+    -- absorbed faster than the rotting fruit tops it up, which hides the thing under test.
     it("gives off spores as the spilled fruit goes", function()
         local arena = world.arena(gleba())
-        ripe_plant(arena, "yumako-tree").die()
+        local chest = arena.surface.create_entity{
+            name = "steel-chest", position = arena.centre, force = "player" }
+        chest.insert{ name = "yumako", count = 100 }
+        chest.die()
         local first
         after_ticks(2, function() first = arena.surface.get_pollution(arena.centre) end)
         after_ticks(300, function()
             assert.is_true(arena.surface.get_pollution(arena.centre) > first,
                 "spilled fruit should be giving off spores as it rots")
         end)
+    end)
+
+    -- what the game itself would have emitted had the plant been picked instead
+    it("lets go of a harvest of spores when a ripe plant is destroyed", function()
+        local arena = world.arena(gleba())
+        arena.surface.clear_pollution()
+        ripe_plant(arena, "yumako-tree").die()
+        assert.are.equal(15, arena.surface.get_pollution(arena.centre),
+            "destroying a ripe plant should emit what harvesting it would have")
+    end)
+
+    it("lets go of nothing when an unripe plant is destroyed", function()
+        local arena = world.arena(gleba())
+        arena.surface.clear_pollution()
+        arena.surface.create_entity{
+            name = "yumako-tree", position = arena.centre, force = "neutral" }.die()
+        assert.are.equal(0, arena.surface.get_pollution(arena.centre))
+        assert.are.same({}, world.spills(arena))
     end)
 
     it("still leaves a spill of what was in a tank", function()

@@ -25,7 +25,9 @@ for _, plant in pairs(data.raw.plant or {}) do
   if harvest and not spillable[harvest.item] then
     local tint = plant.agricultural_tower_tint
     spillable[harvest.item] = {
-      colour = tint and tint.primary or spill.DEFAULT_COLOUR,
+      colour = spill.FRUIT_COLOURS[harvest.item]
+               or (tint and tint.primary)
+               or spill.DEFAULT_COLOUR,
       source = "plant",
     }
   end

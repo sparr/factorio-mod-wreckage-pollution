@@ -174,3 +174,34 @@ describe("what a plant yields", function()
         assert.is_nil(spill.harvest{ { type = "item", name = "nothing", amount = 0 } })
     end)
 end)
+
+describe("what a spill of fruit looks like and is worth", function()
+    -- a yumako is red on the outside and mashes to orange; a jellynut is mauve and
+    -- presses to green. The colours are taken from what each is processed into, so the
+    -- puddle looks like the pulp rather than the skin.
+    it("gives yumako the orange of its mash, not the red of its skin", function()
+        local colour = spill.FRUIT_COLOURS["yumako"]
+        assert.is_not_nil(colour, "yumako should have a colour of its own")
+        assert.is_true(colour.r > colour.g and colour.g > colour.b,
+            "mashed yumako should read as orange")
+    end)
+
+    it("gives jellynut the green of its jelly, not the mauve of its shell", function()
+        local colour = spill.FRUIT_COLOURS["jellynut"]
+        assert.is_not_nil(colour, "jellynut should have a colour of its own")
+        assert.is_true(colour.g > colour.r and colour.g > colour.b,
+            "jelly should read as green")
+    end)
+
+    --- Harvesting a plant emits 15 spores for 50 fruit, so a fruit is worth 0.3. A spill
+    --- gives up amount * intensity / 50 over its life, so matching that at the default
+    --- intensity of 0.25 wants 60 units per fruit.
+    it("is worth what harvesting it would have emitted, at the default intensity", function()
+        local per_fruit_emission = 15 / 50
+        local default_intensity = 0.25
+        local total = spill.FRUIT_UNITS * default_intensity / 50
+        assert.are.equal(per_fruit_emission, total,
+            ("%d units per fruit gives %.3f where a harvest gives %.3f")
+                :format(spill.FRUIT_UNITS, total, per_fruit_emission))
+    end)
+end)

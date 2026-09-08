@@ -127,9 +127,31 @@ function spill.harvest(results)
   return nil
 end
 
---- What colour a spill of something that is not a fluid is drawn in, when whatever ships
---- it offers none.
+--- What colour a spill of something that is not a fluid is drawn in, when nothing better
+--- is known about it.
 spill.DEFAULT_COLOUR = { r = 0.6, g = 0.6, b = 0.5, a = 1 }
+
+--- How much spill one fruit makes.
+---
+--- A spill gives up its whole amount as pollution over its life, scaled by the intensity
+--- setting: the total works out to amount * intensity / 50, whatever the evaporation rate
+--- is. Harvesting a plant emits 15 spores and yields 50 fruit, so one fruit is worth 0.3
+--- spores, and matching that at the default intensity of 0.25 wants 60 units of spill per
+--- fruit. Fixed rather than divided by the intensity, so that turning the intensity up
+--- still turns fruit up along with everything else.
+spill.FRUIT_UNITS = 60
+
+--- Fruit whose own icon is a poor guide to what a puddle of it looks like. A yumako is
+--- red on the outside and mashes to orange; a jellynut is mauve and presses to green.
+--- These are the mean colour of the icon of what each is processed into. Anything not
+--- named here falls back to the tint the game uses for that plant on an agricultural
+--- tower, so a mod that adds a plant still gets a sensible colour.
+spill.FRUIT_COLOURS = {
+  -- yumako mash
+  ["yumako"] = { r = 0.710, g = 0.435, b = 0.235, a = 1 },
+  -- jelly
+  ["jellynut"] = { r = 0.384, g = 0.651, b = 0.278, a = 1 },
+}
 
 ---@class SpillBox
 ---@field left_top {x: number, y: number}
