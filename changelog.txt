@@ -1,6 +1,9 @@
 ---------------------------------------------------------------------------------------------------
 Version: 2.1.1
-Date: ????
+Date: 2026-09-08
+  Changes:
+    - Water and steam are now recognised the same way everywhere. Nothing a player does
+      changes, but the two lists behind it were kept in two places and could disagree
 ---------------------------------------------------------------------------------------------------
 Version: 2.1.0
 Date: 2026-09-08
