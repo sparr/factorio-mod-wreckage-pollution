@@ -91,6 +91,23 @@ describe("taking one tank out of a connected group", function()
         end
     end)
 
+    it("keeps its sums straight when two tanks die on the same tick", function()
+        -- Each death is answered with the segment as it stands at that moment: the first
+        -- takes the group from 75000 of room to 50000, so 10000 of the 60000 spills, and
+        -- the second leaves one 25000 tank standing, so 25000 more goes. Between them
+        -- exactly what the surviving tank cannot hold is on the ground -- nothing double
+        -- counted, nothing missed.
+        local arena = world.arena(game.surfaces.nauvis)
+        local tanks = world.connected_tanks(arena, 3)
+        tanks[1].insert_fluid{ name = "crude-oil", amount = 60000 }
+        tanks[1].die()
+        tanks[2].die()
+        assert.are.same({ ["chemical-spill-crude-oil-large"] = 2 }, world.spills(arena))
+        assert.is_near(35000, world.spilled_amount(arena), 1)
+        assert.is_near(25000, tanks[3].get_fluid_count(), 1,
+            "the surviving tank should be full")
+    end)
+
     it("spills exactly the overflow when the group was full", function()
         local arena = world.arena(game.surfaces.nauvis)
         local tanks = world.connected_tanks(arena, 4)

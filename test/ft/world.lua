@@ -165,6 +165,27 @@ function world.spills(arena)
     return found
 end
 
+---How much fluid the spills in an arena hold between them. A spill's health is its
+---amount, so the ground can be audited without reaching into the mod's books.
+---@param arena {surface: LuaSurface, centre: MapPosition, radius: number}
+---@return number
+function world.spilled_amount(arena)
+    local total = 0
+    local r = arena.radius + 4
+    for _, entity in pairs(arena.surface.find_entities_filtered{
+        type = "simple-entity",
+        area = {
+            { arena.centre.x - r, arena.centre.y - r },
+            { arena.centre.x + r, arena.centre.y + r },
+        },
+    }) do
+        if entity.name:find("^chemical%-spill%-") or entity.name:find("^liquid%-spill%-") then
+            total = total + entity.health
+        end
+    end
+    return total
+end
+
 ---How many spills of any kind are in an arena.
 ---@param arena table
 ---@return number
