@@ -1,6 +1,9 @@
 ---------------------------------------------------------------------------------------------------
 Version: 2.1.3
 Date: ????
+  Bugfixes:
+    - Removing one tank from a connected group no longer spills fluid the rest of the
+      group catches. Only what overflows the remaining tanks and pipes hits the ground
 ---------------------------------------------------------------------------------------------------
 Version: 2.1.2
 Date: 2026-09-08

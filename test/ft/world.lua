@@ -119,6 +119,32 @@ function world.tank(arena, fluid, amount)
     return tank
 end
 
+---A group of storage tanks joined into one fluid segment, corner to corner in a
+---diagonal line. Each is asserted onto the same segment as the first, so a fixture
+---failing here says the tanks did not connect rather than pretending the mod misbehaved.
+---@param arena {surface: LuaSurface, centre: MapPosition}
+---@param n number
+---@return LuaEntity[]
+function world.connected_tanks(arena, n)
+    local c = arena.centre
+    local tanks = {}
+    for i = 0, n - 1 do
+        local tank = arena.surface.create_entity{
+            name = "storage-tank",
+            position = { c.x - 5 + i * 3, c.y - 4 + i * 2 },
+            force = "player",
+        }
+        assert(tank, "could not place tank " .. i + 1 .. " on " .. arena.surface.name)
+        tanks[i + 1] = tank
+    end
+    local segment = tanks[1].get_fluid_segment_id(1)
+    for i = 2, n do
+        assert(segment == tanks[i].get_fluid_segment_id(1),
+            "tank " .. i .. " did not join the segment")
+    end
+    return tanks
+end
+
 ---Every spill entity in an arena, by prototype name.
 ---@param arena {surface: LuaSurface, centre: MapPosition, radius: number}
 ---@return table<string, number>

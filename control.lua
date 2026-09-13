@@ -228,8 +228,17 @@ local function isFruit(item_name)
   return is_fruit[item_name] == true
 end
 
----Fluid held in an entity's tanks, which the game throws away whether the entity is
----destroyed or taken apart, so it is spilled either way.
+---Fluid the game will actually throw away when this entity goes, whether it is destroyed
+---or taken apart, so it is spilled either way.
+---
+---2.0 pools fluid across a whole connected segment, and get_fluid on one tank of a group
+---answers with that tank's proportional share -- which is not what is lost. Measured on
+---2.1.17, for mining and for dying alike: when a tank leaves its segment the fluid stays
+---behind, filling what volume remains, and only the overflow is destroyed. So one tank
+---taken out of a group of four spills nothing, and one taken out of a full group spills
+---exactly one tank's worth. A lone tank is a segment of exactly its own volume, so
+---everything in it is the overflow. Fluid in a storage with no segment at all -- a fluid
+---wagon's tank -- is thrown away whole, as it always was.
 ---@param e LuaEntity
 ---@return {what: string, amount: number}[]
 local function fluidsOf(e)
@@ -239,9 +248,35 @@ local function fluidsOf(e)
   -- off one was an error that took the mod down with it. It also counts fluid held
   -- outside a fluidbox proper, so a destroyed fluid wagon or fluid turret spills what it
   -- was carrying, which it never used to.
+  local segments = {}
   for b = 1, e.fluids_count do
-    local fluid = e.get_fluid(b)
-    if fluid then found[#found + 1] = { what = fluid.name, amount = fluid.amount } end
+    if e.has_fluid_segment(b) then
+      -- Two of this entity's storages can share one segment when pipes loop around, and
+      -- the segment loses both their volumes at once, so they are tallied together.
+      local id = e.get_fluid_segment_id(b)
+      local seg = segments[id]
+      if seg then
+        seg.leaving = seg.leaving + e.get_fluid_capacity(b)
+      else
+        local fluid = e.get_fluid_segment_fluid(b)
+        if fluid then
+          segments[id] = {
+            fluid = fluid,
+            capacity = e.get_fluid_segment_capacity(b),
+            leaving = e.get_fluid_capacity(b),
+          }
+        end
+      end
+    else
+      local fluid = e.get_fluid(b)
+      if fluid then found[#found + 1] = { what = fluid.name, amount = fluid.amount } end
+    end
+  end
+  for _, seg in pairs(segments) do
+    local lost = seg.fluid.amount - (seg.capacity - seg.leaving)
+    if lost > 0 then
+      found[#found + 1] = { what = seg.fluid.name, amount = lost }
+    end
   end
   return found
 end

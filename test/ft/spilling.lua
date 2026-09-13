@@ -72,6 +72,55 @@ describe("destroying something that holds no fluid at all", function()
     end)
 end)
 
+describe("taking one tank out of a connected group", function()
+    -- 2.0 pools fluid across a connected segment. Removing one tank leaves the fluid in
+    -- the segment up to what still fits, so only the overflow is really thrown away --
+    -- and only the overflow should hit the ground.
+    it("spills nothing while the rest of the group can hold the fluid", function()
+        for _, how in pairs{ "mined", "destroyed" } do
+            local arena = world.arena(game.surfaces.nauvis)
+            local tanks = world.connected_tanks(arena, 4)
+            tanks[1].insert_fluid{ name = "crude-oil", amount = 20000 }
+            if how == "mined" then
+                game.players[1].mine_entity(tanks[1], true)
+            else
+                tanks[1].die()
+            end
+            assert.are.same({}, world.spills(arena),
+                "the fluid all fits in the other three tanks (" .. how .. ")")
+        end
+    end)
+
+    it("spills exactly the overflow when the group was full", function()
+        local arena = world.arena(game.surfaces.nauvis)
+        local tanks = world.connected_tanks(arena, 4)
+        tanks[1].insert_fluid{ name = "crude-oil", amount = 100000 }
+        game.players[1].mine_entity(tanks[1], true)
+        -- one tank's worth, 25000, has nowhere left to go: a large spill
+        assert.are.same({ ["chemical-spill-crude-oil-large"] = 1 }, world.spills(arena))
+    end)
+end)
+
+describe("a fluid wagon", function()
+    -- a wagon's tank belongs to no segment, so what it carries is thrown away whole
+    it("spills what it was carrying when destroyed", function()
+        local arena = world.arena(game.surfaces.nauvis)
+        for i = -2, 2 do
+            arena.surface.create_entity{
+                name = "straight-rail",
+                position = { arena.centre.x + 1, arena.centre.y + i * 2 },
+                force = "player" }
+        end
+        local wagon = arena.surface.create_entity{
+            name = "fluid-wagon", position = { arena.centre.x + 1, arena.centre.y },
+            force = "player" }
+        assert.is_not_nil(wagon, "could not place a fluid wagon")
+        wagon.insert_fluid{ name = "crude-oil", amount = 20000 }
+        wagon.die()
+        assert.are.same({ ["chemical-spill-crude-oil-large"] = 1 }, world.spills(arena))
+    end)
+end)
+
 describe("mining something full of fluid", function()
     -- the mod listens for the pre-mined events as well as death, so a tank taken apart
     -- spills what was in it rather than swallowing it
